@@ -51,7 +51,7 @@ print('Sample source location: ', source_pos)
 audio_sensor.setAudioSourceTransform(source_pos + np.array([0, 1.5, 0])) # add 1.5m to the height calculation 
 agent = sim.get_agent(0)
 new_state = sim.get_agent(0).get_state()
-new_state.position = np.array(source_pos + np.array([2, 0, 0]))
+new_state.position = np.array(source_pos + np.array([-1, 0, 1]))
 print('agent position', new_state.position)
 new_state.sensor_states = {}
 agent.set_state(new_state, True)
@@ -97,17 +97,18 @@ print(f'RT60 of the rendered IR is {rt60:.4f} seconds')
 action_names = list(cfg.agents[0].action_space.keys())
 print('action names', action_names)
 for action in action_names:
-    print('taking action', action)
-    sim.step(action)
-    print('done taking action')
+    print()
+    #print('taking action', action)
+    #sim.step(action)
+    #print('done taking action')
 
 
 import matplotlib.pyplot as plt
 from habitat.utils.visualizations import maps
 import imageio
 
-# convert 3d points to 2d topdown coordinates
-def convert_points_to_topdown(pathfinder, points, meters_per_pixel):
+# convert 3d points to 2d topdown pixel coordinates
+def convert_points_to_topdown_pixel_coordinates(pathfinder, points, meters_per_pixel):
     points_topdown = []
     bounds = pathfinder.get_bounds()
     for point in points:
@@ -119,20 +120,22 @@ def convert_points_to_topdown(pathfinder, points, meters_per_pixel):
 
 
 # display a topdown map with matplotlib
-def display_map(topdown_map, key_points=None):
+def display_map(topdown_map, out_file, key_points=None):
     plt.figure(figsize=(12, 8))
     ax = plt.subplot(1, 1, 1)
-    ax.axis("off")
+    #ax.axis("off")
     plt.imshow(topdown_map)
     # plot points on map
+    print('key_points', key_points)
     if key_points is not None:
         for point in key_points:
             plt.plot(point[0], point[1], marker="o", markersize=10, alpha=0.8)
-    plt.show(block=False)
+    #plt.show(block=False)
+    plt.savefig(os.path.join('/content', out_file))
 
 # @markdown ###Configure Example Parameters:
 # @markdown Configure the map resolution:
-meters_per_pixel = 0.1  # @param {type:"slider", min:0.01, max:1.0, step:0.01}
+meters_per_pixel = 0.01  # @param {type:"slider", min:0.01, max:1.0, step:0.01}
 # @markdown ---
 # @markdown Customize the map slice height (global y coordinate):
 custom_height = False  # @param {type:"boolean"}
@@ -140,7 +143,8 @@ height = 1  # @param {type:"slider", min:-10, max:10, step:0.1}
 # @markdown If not using custom height, default to scene lower limit.
 # @markdown (Cell output provides scene height range from bounding box for reference.)
 
-print("The NavMesh bounds are: " + str(sim.pathfinder.get_bounds()))
+bounds = sim.pathfinder.get_bounds()
+print("The NavMesh bounds are: " + str(bounds))
 if not custom_height:
     # get bounding box minimum elevation for automatic height
     height = sim.pathfinder.get_bounds()[0][1]
@@ -160,12 +164,18 @@ else:
         [[255, 255, 255], [128, 128, 128], [0, 0, 0]], dtype=np.uint8
     )
     hablab_topdown_map = recolor_map[hablab_topdown_map]
+
+    agent_pos = agent.get_state().position
+    pos_pixels = convert_points_to_topdown_pixel_coordinates(sim.pathfinder, [source_pos, agent_pos], meters_per_pixel)
+    print('source position', source_pos)
+    print('agent position', agent_pos)
+    print('source and agent pixel positions', pos_pixels)
+
     print("Displaying the raw map from get_topdown_view:")
-    display_map(sim_topdown_map)
+    display_map(sim_topdown_map, 'habitat_sim_get_topdown_view', key_points=pos_pixels)
     print("Displaying the map from the Habitat-Lab maps module:")
-    display_map(hablab_topdown_map)
+    display_map(hablab_topdown_map, 'habitat_lab_get_topdown_map', key_points=pos_pixels)
 
     # easily save a map to file:
     map_filename = os.path.join("/content", "top_down_map.png")
     imageio.imsave(map_filename, hablab_topdown_map)
-
