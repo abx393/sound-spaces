@@ -52,6 +52,7 @@ audio_sensor.setAudioSourceTransform(source_pos + np.array([0, 1.5, 0])) # add 1
 agent = sim.get_agent(0)
 new_state = sim.get_agent(0).get_state()
 new_state.position = np.array(source_pos + np.array([2, 0, 0]))
+print('agent position', new_state.position)
 new_state.sensor_states = {}
 agent.set_state(new_state, True)
 ir = np.array(sim.get_sensor_observations()["audio_sensor"])
@@ -92,3 +93,79 @@ from pyroomacoustics.experimental.rt60 import measure_rt60
 
 rt60 = measure_rt60(ir[0], sr, decay_db=30, plot=True)
 print(f'RT60 of the rendered IR is {rt60:.4f} seconds')
+
+action_names = list(cfg.agents[0].action_space.keys())
+print('action names', action_names)
+for action in action_names:
+    print('taking action', action)
+    sim.step(action)
+    print('done taking action')
+
+
+import matplotlib.pyplot as plt
+from habitat.utils.visualizations import maps
+import imageio
+
+# convert 3d points to 2d topdown coordinates
+def convert_points_to_topdown(pathfinder, points, meters_per_pixel):
+    points_topdown = []
+    bounds = pathfinder.get_bounds()
+    for point in points:
+        # convert 3D x,z to topdown x,y
+        px = (point[0] - bounds[0][0]) / meters_per_pixel
+        py = (point[2] - bounds[0][2]) / meters_per_pixel
+        points_topdown.append(np.array([px, py]))
+    return points_topdown
+
+
+# display a topdown map with matplotlib
+def display_map(topdown_map, key_points=None):
+    plt.figure(figsize=(12, 8))
+    ax = plt.subplot(1, 1, 1)
+    ax.axis("off")
+    plt.imshow(topdown_map)
+    # plot points on map
+    if key_points is not None:
+        for point in key_points:
+            plt.plot(point[0], point[1], marker="o", markersize=10, alpha=0.8)
+    plt.show(block=False)
+
+# @markdown ###Configure Example Parameters:
+# @markdown Configure the map resolution:
+meters_per_pixel = 0.1  # @param {type:"slider", min:0.01, max:1.0, step:0.01}
+# @markdown ---
+# @markdown Customize the map slice height (global y coordinate):
+custom_height = False  # @param {type:"boolean"}
+height = 1  # @param {type:"slider", min:-10, max:10, step:0.1}
+# @markdown If not using custom height, default to scene lower limit.
+# @markdown (Cell output provides scene height range from bounding box for reference.)
+
+print("The NavMesh bounds are: " + str(sim.pathfinder.get_bounds()))
+if not custom_height:
+    # get bounding box minimum elevation for automatic height
+    height = sim.pathfinder.get_bounds()[0][1]
+
+if not sim.pathfinder.is_loaded:
+    print("Pathfinder not initialized, aborting.")
+else:
+    # @markdown You can get the topdown map directly from the Habitat-sim API with *PathFinder.get_topdown_view*.
+    # This map is a 2D boolean array
+    sim_topdown_map = sim.pathfinder.get_topdown_view(meters_per_pixel, height)
+    
+    # @markdown Alternatively, you can process the map using the Habitat-Lab [maps module](https://github.com/facebookresearch/habitat-lab/blob/main/habitat/utils/visualizations/maps.py)
+    hablab_topdown_map = maps.get_topdown_map(
+        sim.pathfinder, height, meters_per_pixel=meters_per_pixel
+    )
+    recolor_map = np.array(
+        [[255, 255, 255], [128, 128, 128], [0, 0, 0]], dtype=np.uint8
+    )
+    hablab_topdown_map = recolor_map[hablab_topdown_map]
+    print("Displaying the raw map from get_topdown_view:")
+    display_map(sim_topdown_map)
+    print("Displaying the map from the Habitat-Lab maps module:")
+    display_map(hablab_topdown_map)
+
+    # easily save a map to file:
+    map_filename = os.path.join("/content", "top_down_map.png")
+    imageio.imsave(map_filename, hablab_topdown_map)
+
