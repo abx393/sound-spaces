@@ -3,12 +3,13 @@ import quaternion
 import habitat_sim.sim
 import numpy as np
 from scipy.io import wavfile
-
+import random
 
 os.chdir('/content/sound-spaces')
 dataset = 'mp3d' # or replace with 'mp3d', one example for each dataset
 
 backend_cfg = habitat_sim.SimulatorConfiguration()
+
 if dataset == 'mp3d':
     backend_cfg.scene_id = "data/scene_datasets/mp3d/17DRP5sb8fy/17DRP5sb8fy.glb"
     # IMPORTANT: missing this file will lead to load the semantic scene incorrectly
@@ -22,6 +23,10 @@ backend_cfg.enable_physics = False
 agent_config = habitat_sim.AgentConfiguration()
 cfg = habitat_sim.Configuration(backend_cfg, [agent_config])
 sim = habitat_sim.Simulator(cfg)
+
+seed = random.randint(0, 100)
+print('seed', seed)
+sim.seed(seed)
 
 # set navmesh path for searching for navigable points
 if dataset == 'mp3d':
@@ -51,7 +56,7 @@ print('Sample source location: ', source_pos)
 audio_sensor.setAudioSourceTransform(source_pos + np.array([0, 1.5, 0])) # add 1.5m to the height calculation 
 agent = sim.get_agent(0)
 new_state = sim.get_agent(0).get_state()
-new_state.position = np.array(source_pos + np.array([-1, 0, 1]))
+new_state.position = sim.pathfinder.get_random_navigable_point_near(source_pos, 2)
 print('agent position', new_state.position)
 new_state.sensor_states = {}
 agent.set_state(new_state, True)
@@ -106,6 +111,8 @@ for action in action_names:
 import matplotlib.pyplot as plt
 from habitat.utils.visualizations import maps
 import imageio
+from scipy.spatial.transform import Rotation as R
+import math
 
 # convert 3d points to 2d topdown pixel coordinates
 def convert_points_to_topdown_pixel_coordinates(pathfinder, points, meters_per_pixel):
@@ -120,18 +127,42 @@ def convert_points_to_topdown_pixel_coordinates(pathfinder, points, meters_per_p
 
 
 # display a topdown map with matplotlib
-def display_map(topdown_map, out_file, key_points=None):
+def display_map(topdown_map, out_file, source_pos=None, agent_pos=None, agent_angle=None):
     plt.figure(figsize=(12, 8))
     ax = plt.subplot(1, 1, 1)
     #ax.axis("off")
     plt.imshow(topdown_map)
     # plot points on map
-    print('key_points', key_points)
-    if key_points is not None:
-        for point in key_points:
-            plt.plot(point[0], point[1], marker="o", markersize=10, alpha=0.8)
+    if source_pos is not None:
+        plt.plot(source_pos[0], source_pos[1], marker="o", markersize=10, alpha=0.8)
+    if agent_pos is not None:
+        plt.plot(agent_pos[0], agent_pos[1], marker="o", markersize=10, alpha=0.8)
+    if agent_angle is not None:
+        arrow_len = 50
+        arrow_dest = (agent_pos[0] + arrow_len * math.sin(agent_angle), agent_pos[1] - arrow_len * math.cos(agent_angle))
+        ax.annotate('', xytext=agent_pos, xy=arrow_dest, arrowprops=dict(arrowstyle="->"))
+
+
     #plt.show(block=False)
     plt.savefig(os.path.join('/content', out_file))
+
+def quaternion_to_axis_angle(quat):
+    q_array = np.array([quat.x, quat.y, quat.z, quat.w])
+    rotation = R.from_quat(q_array)
+    
+    # Get the axis-angle representation
+    axis_angle = rotation.as_rotvec()
+    
+    # Calculate the angle from the magnitude of the rotation vector
+    angle = np.linalg.norm(axis_angle)
+    
+    # Normalize the rotation vector to get the axis
+    if angle != 0:
+        axis = axis_angle / angle
+    else:
+        axis = np.array([1.0, 0.0, 0.0])  # Handle zero rotation case
+
+    return axis, angle
 
 # @markdown ###Configure Example Parameters:
 # @markdown Configure the map resolution:
@@ -165,16 +196,55 @@ else:
     )
     hablab_topdown_map = recolor_map[hablab_topdown_map]
 
+    agent_rot_quat = agent.get_state().rotation
     agent_pos = agent.get_state().position
     pos_pixels = convert_points_to_topdown_pixel_coordinates(sim.pathfinder, [source_pos, agent_pos], meters_per_pixel)
     print('source position', source_pos)
     print('agent position', agent_pos)
+    print('agent rotation quaternion', agent_rot_quat)
+    rot_axis, rot_angle = quaternion_to_axis_angle(agent_rot_quat)
+    print('rot_axis', rot_axis)
+    print('rot_angle', rot_angle)
     print('source and agent pixel positions', pos_pixels)
 
     print("Displaying the raw map from get_topdown_view:")
-    display_map(sim_topdown_map, 'habitat_sim_get_topdown_view', key_points=pos_pixels)
+    display_map(sim_topdown_map, 'habitat_sim_get_topdown_view', source_pos=pos_pixels[0], agent_pos=pos_pixels[1], agent_angle=rot_angle)
     print("Displaying the map from the Habitat-Lab maps module:")
-    display_map(hablab_topdown_map, 'habitat_lab_get_topdown_map', key_points=pos_pixels)
+    display_map(hablab_topdown_map, 'habitat_lab_get_topdown_map', source_pos=pos_pixels[0], agent_pos=pos_pixels[1], agent_angle=rot_angle)
+
+sim.step('turn_right')
+
+if not sim.pathfinder.is_loaded:
+    print("Pathfinder not initialized, aborting.")
+else:
+    # @markdown You can get the topdown map directly from the Habitat-sim API with *PathFinder.get_topdown_view*.
+    # This map is a 2D boolean array
+    sim_topdown_map = sim.pathfinder.get_topdown_view(meters_per_pixel, height)
+    
+    # @markdown Alternatively, you can process the map using the Habitat-Lab [maps module](https://github.com/facebookresearch/habitat-lab/blob/main/habitat/utils/visualizations/maps.py)
+    hablab_topdown_map = maps.get_topdown_map(
+        sim.pathfinder, height, meters_per_pixel=meters_per_pixel
+    )
+    recolor_map = np.array(
+        [[255, 255, 255], [128, 128, 128], [0, 0, 0]], dtype=np.uint8
+    )
+    hablab_topdown_map = recolor_map[hablab_topdown_map]
+
+    agent_rot_quat = agent.get_state().rotation
+    agent_pos = agent.get_state().position
+    pos_pixels = convert_points_to_topdown_pixel_coordinates(sim.pathfinder, [source_pos, agent_pos], meters_per_pixel)
+    print('after forward source position', source_pos)
+    print('after forward agent position', agent_pos)
+    print('agent rotation quaternion', agent_rot_quat)
+    rot_axis, rot_angle = quaternion_to_axis_angle(agent_rot_quat)
+    print('rot_axis', rot_axis)
+    print('rot_angle', rot_angle)
+    print('source and agent pixel positions', pos_pixels)
+
+    print("Displaying the raw map from get_topdown_view:")
+    display_map(sim_topdown_map, 'after_forward_habitat_sim_get_topdown_view', source_pos=pos_pixels[0], agent_pos=pos_pixels[1], agent_angle=rot_angle)
+    print("Displaying the map from the Habitat-Lab maps module:")
+    display_map(hablab_topdown_map, 'after_forward_habitat_lab_get_topdown_map', source_pos=pos_pixels[0], agent_pos=pos_pixels[1], agent_angle=rot_angle)
 
     # easily save a map to file:
     map_filename = os.path.join("/content", "top_down_map.png")
