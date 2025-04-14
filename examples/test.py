@@ -1,9 +1,17 @@
 import os
+from re import I
 import quaternion
 import habitat_sim.sim
 import numpy as np
 from scipy.io import wavfile
 import random
+import matplotlib.pyplot as plt
+from habitat.utils.visualizations import maps
+import imageio
+from scipy.spatial.transform import Rotation as R
+import math
+from pyroomacoustics.experimental.rt60 import measure_rt60
+from scipy.signal import fftconvolve
 
 os.chdir('/content/sound-spaces')
 dataset = 'mp3d' # or replace with 'mp3d', one example for each dataset
@@ -61,14 +69,10 @@ print('agent position', new_state.position)
 new_state.sensor_states = {}
 agent.set_state(new_state, True)
 ir = np.array(sim.get_sensor_observations()["audio_sensor"])
-print(ir.shape)
-
-# one a category is not found in the material mapping file, the default acoustic material will be used.
-
+print('ir shape', ir.shape)
 
 # check if the direct sound is present (source is visibile from the listener)
 print('source is visble', audio_sensor.sourceIsVisible())
-
 
 # check the efficiency of rendering, outdoor would have a very low value, e.g. < 0.05, 
 # while a closed indoor room would have >0.95, and a room with some holes might be in the 0.1-0.8 range.
@@ -77,42 +81,37 @@ print('source is visble', audio_sensor.sourceIsVisible())
 print('ray efficiency', audio_sensor.getRayEfficiency())
 
 # plot the waveform of IR and show the audio
-from librosa.display import waveshow, specshow
-import IPython
+sr = 48000
+samples_clip = 10000
+plt.title('Impulse Response')
+for i in range(2):
+    plt.plot(np.linspace(0, samples_clip / sr, samples_clip), ir[i, :samples_clip])
+    plt.savefig(os.path.join('/content', 'ir{}'.format(i)))
 
-waveshow(ir[0, :10000], sr=48000)
-IPython.display.Audio(ir, rate=48000)
+plt.clf()
 
 # one example for how to use IR data to get the reverberant speech
 sr, vocal = wavfile.read('res/singing.wav')
-print(sr, vocal.shape)
-IPython.display.Audio(vocal, rate=sr)
-
-from scipy.signal import fftconvolve
+print('sr', sr, 'vocal shape', vocal.shape)
+plt.title('Original Speech')
+plt.plot(np.linspace(0, len(vocal) / sr, len(vocal)), vocal)
+plt.savefig(os.path.join('/content', 'original_speech'))
+plt.clf()
 
 # convolve the vocal with IR
-convolved_vocal = np.array([fftconvolve(vocal, ir_channel) for ir_channel in ir]) 
-IPython.display.Audio(convolved_vocal, rate=sr)
-
-from pyroomacoustics.experimental.rt60 import measure_rt60
+convolved_vocal = np.array([fftconvolve(vocal, ir_channel) for ir_channel in ir])
+print('convolved_vocal.shape', convolved_vocal.shape)
+plt.title('Speech convolved with IR')
+for i in range(2):
+    plt.plot(np.linspace(0, len(convolved_vocal[i]) / sr, len(convolved_vocal[i])), convolved_vocal[i])
+    plt.savefig(os.path.join('/content', 'speech_convolved_with_ir{}'.format(i)))
+plt.clf()
 
 rt60 = measure_rt60(ir[0], sr, decay_db=30, plot=True)
 print(f'RT60 of the rendered IR is {rt60:.4f} seconds')
 
 action_names = list(cfg.agents[0].action_space.keys())
 print('action names', action_names)
-for action in action_names:
-    print()
-    #print('taking action', action)
-    #sim.step(action)
-    #print('done taking action')
-
-
-import matplotlib.pyplot as plt
-from habitat.utils.visualizations import maps
-import imageio
-from scipy.spatial.transform import Rotation as R
-import math
 
 # convert 3d points to 2d topdown pixel coordinates
 def convert_points_to_topdown_pixel_coordinates(pathfinder, points, meters_per_pixel):
@@ -164,15 +163,10 @@ def quaternion_to_axis_angle(quat):
 
     return axis, angle
 
-# @markdown ###Configure Example Parameters:
-# @markdown Configure the map resolution:
 meters_per_pixel = 0.01  # @param {type:"slider", min:0.01, max:1.0, step:0.01}
-# @markdown ---
 # @markdown Customize the map slice height (global y coordinate):
 custom_height = False  # @param {type:"boolean"}
-height = 1  # @param {type:"slider", min:-10, max:10, step:0.1}
-# @markdown If not using custom height, default to scene lower limit.
-# @markdown (Cell output provides scene height range from bounding box for reference.)
+height = 1
 
 bounds = sim.pathfinder.get_bounds()
 print("The NavMesh bounds are: " + str(bounds))
