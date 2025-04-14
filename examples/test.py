@@ -12,6 +12,7 @@ from scipy.spatial.transform import Rotation as R
 import math
 from pyroomacoustics.experimental.rt60 import measure_rt60
 from scipy.signal import fftconvolve
+from pydub import AudioSegment
 
 os.chdir('/content/sound-spaces')
 dataset = 'mp3d' # or replace with 'mp3d', one example for each dataset
@@ -90,14 +91,18 @@ for i in range(2):
 
 plt.clf()
 
-# one example for how to use IR data to get the reverberant speech
-sr, vocal = wavfile.read('res/singing.wav')
+# convert input audio from stereo to mono
+sound = AudioSegment.from_wav('/content/follow_me.wav')
+sound = sound.set_channels(1)
+sound.export("/content/follow_me_mono.wav", format="wav")
+
+sr, vocal = wavfile.read('/content/follow_me_mono.wav')
 print('sr', sr, 'vocal shape', vocal.shape)
+
 plt.title('Original Speech')
 plt.plot(np.linspace(0, len(vocal) / sr, len(vocal)), vocal)
 plt.savefig(os.path.join('/content', 'original_speech'))
 plt.clf()
-print('vocal', vocal[:30])
 
 # convolve the vocal with IR
 convolved_vocal = np.array([fftconvolve(vocal, ir_channel) for ir_channel in ir])
@@ -211,41 +216,4 @@ else:
     display_map(sim_topdown_map, 'habitat_sim_get_topdown_view', source_pos=pos_pixels[0], agent_pos=pos_pixels[1], agent_angle=rot_angle)
     print("Displaying the map from the Habitat-Lab maps module:")
     display_map(hablab_topdown_map, 'habitat_lab_get_topdown_map', source_pos=pos_pixels[0], agent_pos=pos_pixels[1], agent_angle=rot_angle)
-
-sim.step('turn_right')
-
-if not sim.pathfinder.is_loaded:
-    print("Pathfinder not initialized, aborting.")
-else:
-    # @markdown You can get the topdown map directly from the Habitat-sim API with *PathFinder.get_topdown_view*.
-    # This map is a 2D boolean array
-    sim_topdown_map = sim.pathfinder.get_topdown_view(meters_per_pixel, height)
     
-    # @markdown Alternatively, you can process the map using the Habitat-Lab [maps module](https://github.com/facebookresearch/habitat-lab/blob/main/habitat/utils/visualizations/maps.py)
-    hablab_topdown_map = maps.get_topdown_map(
-        sim.pathfinder, height, meters_per_pixel=meters_per_pixel
-    )
-    recolor_map = np.array(
-        [[255, 255, 255], [128, 128, 128], [0, 0, 0]], dtype=np.uint8
-    )
-    hablab_topdown_map = recolor_map[hablab_topdown_map]
-
-    agent_rot_quat = agent.get_state().rotation
-    agent_pos = agent.get_state().position
-    pos_pixels = convert_points_to_topdown_pixel_coordinates(sim.pathfinder, [source_pos, agent_pos], meters_per_pixel)
-    print('after forward source position', source_pos)
-    print('after forward agent position', agent_pos)
-    print('agent rotation quaternion', agent_rot_quat)
-    rot_axis, rot_angle = quaternion_to_axis_angle(agent_rot_quat)
-    print('rot_axis', rot_axis)
-    print('rot_angle', rot_angle)
-    print('source and agent pixel positions', pos_pixels)
-
-    print("Displaying the raw map from get_topdown_view:")
-    display_map(sim_topdown_map, 'after_forward_habitat_sim_get_topdown_view', source_pos=pos_pixels[0], agent_pos=pos_pixels[1], agent_angle=rot_angle)
-    print("Displaying the map from the Habitat-Lab maps module:")
-    display_map(hablab_topdown_map, 'after_forward_habitat_lab_get_topdown_map', source_pos=pos_pixels[0], agent_pos=pos_pixels[1], agent_angle=rot_angle)
-
-    # easily save a map to file:
-    map_filename = os.path.join("/content", "top_down_map.png")
-    imageio.imsave(map_filename, hablab_topdown_map)
