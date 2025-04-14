@@ -97,6 +97,7 @@ plt.title('Original Speech')
 plt.plot(np.linspace(0, len(vocal) / sr, len(vocal)), vocal)
 plt.savefig(os.path.join('/content', 'original_speech'))
 plt.clf()
+print('vocal', vocal[:30])
 
 # convolve the vocal with IR
 convolved_vocal = np.array([fftconvolve(vocal, ir_channel) for ir_channel in ir])
@@ -106,6 +107,11 @@ for i in range(2):
     plt.plot(np.linspace(0, len(convolved_vocal[i]) / sr, len(convolved_vocal[i])), convolved_vocal[i])
     plt.savefig(os.path.join('/content', 'speech_convolved_with_ir{}'.format(i)))
 plt.clf()
+
+convolved_vocal = convolved_vocal / np.expand_dims(np.max(convolved_vocal, axis=1), axis=1)
+#convolved_vocal = convolved_vocal.astype(np.int32)
+
+wavfile.write(os.path.join('/content', 'reverberent_audio.wav'), sr, convolved_vocal.T)
 
 rt60 = measure_rt60(ir[0], sr, decay_db=30, plot=True)
 print(f'RT60 of the rendered IR is {rt60:.4f} seconds')
