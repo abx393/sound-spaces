@@ -126,7 +126,7 @@ print('max(convolved_vocal) after', np.max(convolved_vocal))
 print('min(convolved_vocal) after', np.min(convolved_vocal))
 #convolved_vocal = (convolved_vocal / np.max(convolved_vocal) * np.iinfo(np.int16).max).astype(np.int16)
 
-wavfile.write(os.path.join('/content', 'output', 'reverberent_speech_anothertest.wav'), sr, convolved_vocal.T)
+wavfile.write(os.path.join('/content', 'output', 'reverberent_speech.wav'), sr, convolved_vocal.T)
 
 rt60 = measure_rt60(ir[0], sr, decay_db=30, plot=True)
 print(f'RT60 of the rendered IR is {rt60:.4f} seconds')
