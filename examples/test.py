@@ -15,7 +15,8 @@ from scipy.signal import fftconvolve
 from pydub import AudioSegment
 
 os.chdir('/content/sound-spaces')
-dataset = 'mp3d' # or replace with 'mp3d', one example for each dataset
+os.makedirs('/content/output', exist_ok=True)
+dataset = 'mp3d'
 
 backend_cfg = habitat_sim.SimulatorConfiguration()
 
@@ -87,12 +88,14 @@ samples_clip = 10000
 plt.title('Impulse Response')
 for i in range(2):
     plt.plot(np.linspace(0, samples_clip / sr, samples_clip), ir[i, :samples_clip])
-    plt.savefig(os.path.join('/content', 'ir{}'.format(i)))
+    plt.savefig(os.path.join('/content', 'output', 'ir{}'.format(i)))
 
 plt.clf()
 
+
+
 # convert input audio from stereo to mono
-sound = AudioSegment.from_wav('/content/follow_me.wav')
+sound = AudioSegment.from_wav('/content/drive/MyDrive/speech_navigation/follow_me.wav')
 sound = sound.set_channels(1)
 sound.export("/content/follow_me_mono.wav", format="wav")
 
@@ -101,7 +104,7 @@ print('sr', sr, 'vocal shape', vocal.shape)
 
 plt.title('Original Speech')
 plt.plot(np.linspace(0, len(vocal) / sr, len(vocal)), vocal)
-plt.savefig(os.path.join('/content', 'original_speech'))
+plt.savefig(os.path.join('/content', 'output', 'original_speech'))
 plt.clf()
 
 # convolve the vocal with IR
@@ -110,13 +113,20 @@ print('convolved_vocal.shape', convolved_vocal.shape)
 plt.title('Speech convolved with IR')
 for i in range(2):
     plt.plot(np.linspace(0, len(convolved_vocal[i]) / sr, len(convolved_vocal[i])), convolved_vocal[i])
-    plt.savefig(os.path.join('/content', 'speech_convolved_with_ir{}'.format(i)))
+    plt.savefig(os.path.join('/content', 'output', 'speech_convolved_with_ir{}'.format(i)))
 plt.clf()
 
-convolved_vocal = convolved_vocal / np.expand_dims(np.max(convolved_vocal, axis=1), axis=1)
-#convolved_vocal = convolved_vocal.astype(np.int32)
+#convolved_vocal = convolved_vocal / np.expand_dims(np.max(convolved_vocal, axis=1), axis=1)
+print('max(convolved_vocal) before', np.max(convolved_vocal))
+print('min(convolved_vocal) before', np.min(convolved_vocal))
 
-wavfile.write(os.path.join('/content', 'reverberent_audio.wav'), sr, convolved_vocal.T)
+iinfo = np.iinfo(np.int16)
+convolved_vocal = (convolved_vocal / np.max(np.abs(convolved_vocal)) * iinfo.max).astype(np.int16)
+print('max(convolved_vocal) after', np.max(convolved_vocal))
+print('min(convolved_vocal) after', np.min(convolved_vocal))
+#convolved_vocal = (convolved_vocal / np.max(convolved_vocal) * np.iinfo(np.int16).max).astype(np.int16)
+
+wavfile.write(os.path.join('/content', 'output', 'reverberent_speech_anothertest.wav'), sr, convolved_vocal.T)
 
 rt60 = measure_rt60(ir[0], sr, decay_db=30, plot=True)
 print(f'RT60 of the rendered IR is {rt60:.4f} seconds')
@@ -154,7 +164,7 @@ def display_map(topdown_map, out_file, source_pos=None, agent_pos=None, agent_an
 
 
     #plt.show(block=False)
-    plt.savefig(os.path.join('/content', out_file))
+    plt.savefig(os.path.join('/content', 'output', out_file))
 
 def quaternion_to_axis_angle(quat):
     q_array = np.array([quat.x, quat.y, quat.z, quat.w])
