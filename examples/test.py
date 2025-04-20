@@ -14,6 +14,26 @@ from pyroomacoustics.experimental.rt60 import measure_rt60
 from scipy.signal import fftconvolve
 from pydub import AudioSegment
 
+import soundfile as sf
+from scipy import signal
+import torch
+import torch.nn.functional as F
+import spatial_ast
+
+def normalize_audio(audio_data, target_dBFS=-14.0):
+    rms = np.sqrt(np.mean(audio_data**2)) # Calculate the RMS of the audio
+   
+    if rms == 0:  # Avoid division by zero in case of a completely silent audio
+        return audio_data
+    
+    current_dBFS = 20 * np.log10(rms) # Convert RMS to dBFS
+    gain_dB = target_dBFS - current_dBFS # Calculate the required gain in dB
+    gain_linear = 10 ** (gain_dB / 20) # Convert gain from dB to linear scale
+    normalized_audio = audio_data * gain_linear # Apply the gain to the audio data
+    return normalized_audio
+
+device = torch.device('cuda')
+
 os.chdir('/content/sound-spaces')
 os.makedirs('/content/output', exist_ok=True)
 dataset = 'mp3d'
@@ -107,6 +127,7 @@ plt.plot(np.linspace(0, len(vocal) / sr, len(vocal)), vocal)
 plt.savefig(os.path.join('/content', 'output', 'original_speech'))
 plt.clf()
 
+
 # convolve the vocal with IR
 convolved_vocal = np.array([fftconvolve(vocal, ir_channel) for ir_channel in ir])
 print('convolved_vocal.shape', convolved_vocal.shape)
@@ -127,6 +148,8 @@ print('min(convolved_vocal) after', np.min(convolved_vocal))
 #convolved_vocal = (convolved_vocal / np.max(convolved_vocal) * np.iinfo(np.int16).max).astype(np.int16)
 os.makedirs('/content/output/audio/reverberent_speech')
 wavfile.write(os.path.join('/content', 'output', 'audio', 'reverberent_speech', '0.wav'), sr, convolved_vocal.T)
+
+
 
 rt60 = measure_rt60(ir[0], sr, decay_db=30, plot=True)
 print(f'RT60 of the rendered IR is {rt60:.4f} seconds')
@@ -227,3 +250,31 @@ else:
     print("Displaying the map from the Habitat-Lab maps module:")
     display_map(hablab_topdown_map, 'habitat_lab_get_topdown_map', source_pos=pos_pixels[0], agent_pos=pos_pixels[1], agent_angle=rot_angle)
     
+
+
+normalize = False
+waveform, sr = sf.read('/content/drive/MyDrive/speech_navigation/follow_me.wav')
+waveform = waveform[:, 0] if len(waveform.shape) > 1 else waveform
+waveform = signal.resample_poly(waveform, 32000, sr) if sr != 32000 else waveform   
+waveform = normalize_audio(waveform, -14.0) if normalize else waveform
+
+waveform = torch.from_numpy(waveform).reshape(1, -1).float().to(device)
+# We pad all audio samples into 10 seconds long
+padding = 32000 * 10 - waveform.shape[1]
+if padding > 0:
+    waveform = F.pad(waveform, (0, padding), 'constant', 0)
+elif padding < 0:
+    waveform = waveform[:, :32000 * 10]
+
+model = spatial_ast.__dict__['build_AST'](
+    num_classes=355,
+    drop_path_rate=0.1,
+    num_cls_tokens=3,
+)
+
+model.to(device)
+
+ir = torch.from_numpy(ir)
+output = model(waveform.unsqueeze(dim=0), ir.cuda())
+
+print('done spatial ast')
