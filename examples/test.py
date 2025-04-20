@@ -150,7 +150,7 @@ convolved_vocal = (convolved_vocal / np.max(np.abs(convolved_vocal)) * iinfo.max
 print('max(convolved_vocal) after', np.max(convolved_vocal))
 print('min(convolved_vocal) after', np.min(convolved_vocal))
 #convolved_vocal = (convolved_vocal / np.max(convolved_vocal) * np.iinfo(np.int16).max).astype(np.int16)
-os.makedirs('/content/output/audio/reverberent_speech')
+os.makedirs('/content/output/audio/reverberent_speech', exist_ok=True)
 wavfile.write(os.path.join('/content', 'output', 'audio', 'reverberent_speech', '0.wav'), sr, convolved_vocal.T)
 
 
@@ -258,6 +258,7 @@ else:
 print('reverb padding start')
 print('ir.shape before', ir.shape)
 reverb_padding = 32000 * 2 - ir.shape[1]
+ir = torch.from_numpy(ir).float()
 if reverb_padding > 0:
     ir = F.pad(ir, (0, reverb_padding), 'constant', 0)
 elif reverb_padding < 0:
@@ -270,7 +271,7 @@ waveform = waveform[:, 0] if len(waveform.shape) > 1 else waveform
 waveform = signal.resample_poly(waveform, 32000, sr) if sr != 32000 else waveform   
 waveform = normalize_audio(waveform, -14.0) if normalize else waveform
 
-waveform = torch.from_numpy(waveform).reshape(1, -1).float().to(device)
+waveform = torch.from_numpy(waveform).reshape(1, -1).float()
 # We pad all audio samples into 10 seconds long
 padding = 32000 * 10 - waveform.shape[1]
 if padding > 0:
@@ -284,16 +285,17 @@ model = spatial_ast.__dict__['build_AST'](
     num_cls_tokens=3,
 )
 
-checkpoint = torch.load('https://huggingface.co/datasets/zhisheng01/SpatialAudio/blob/main/SpatialAST/finetuned.pth', map_location='cpu')
+checkpoint = torch.load('/content/drive/MyDrive/finetuned.pth', map_location='cpu')
 print('Load pre-trained checkpoint')
 checkpoint_model = checkpoint['model']
 msg = model.load_state_dict(checkpoint_model, strict=False)
 print(msg)
 
 model.to(device)
+waveform.to(device)
+ir.to(device)
 
-ir = torch.from_numpy(ir).float().to(device)
-output = model(torch.unsqueeze(waveform, 0), torch.unsqueeze(ir, 0))
+output = model(torch.unsqueeze(waveform, 0).cuda(), torch.unsqueeze(ir, 0).cuda())
 print('distance prediction', torch.argmax(output[1], dim=1).detach().cpu().numpy())
 print('azimuth prediction', torch.argmax(output[2], dim=1).detach().cpu().numpy())
 print('elevation prediction', torch.argmax(output[3], dim=1).detach().cpu().numpy())
