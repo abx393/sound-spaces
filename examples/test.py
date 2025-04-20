@@ -274,7 +274,7 @@ model = spatial_ast.__dict__['build_AST'](
 
 model.to(device)
 
-ir = torch.from_numpy(ir)
-output = model(waveform.unsqueeze(dim=0), ir.cuda())
+ir = torch.from_numpy(ir).to(device)
+output = model(waveform.unsqueeze(dim=0), ir)
 
 print('done spatial ast')
