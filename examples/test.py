@@ -18,6 +18,10 @@ import soundfile as sf
 from scipy import signal
 import torch
 import torch.nn.functional as F
+import sys
+
+from pathlib import Path
+sys.path.append("/content/Spatial_AST")
 import spatial_ast
 
 def normalize_audio(audio_data, target_dBFS=-14.0):
