@@ -255,6 +255,14 @@ else:
     display_map(hablab_topdown_map, 'habitat_lab_get_topdown_map', source_pos=pos_pixels[0], agent_pos=pos_pixels[1], agent_angle=rot_angle)
     
 
+print('reverb padding start')
+print('ir.shape before', ir.shape)
+reverb_padding = 32000 * 2 - ir.shape[1]
+if reverb_padding > 0:
+    ir = F.pad(ir, (0, reverb_padding), 'constant', 0)
+elif reverb_padding < 0:
+    ir = ir[:, :32000 * 2]
+print('ir.shape after', ir.shape)
 
 normalize = False
 waveform, sr = sf.read('/content/drive/MyDrive/speech_navigation/follow_me.wav')
@@ -278,7 +286,11 @@ model = spatial_ast.__dict__['build_AST'](
 
 model.to(device)
 
-ir = torch.from_numpy(ir).to(device)
-output = model(waveform.unsqueeze(dim=0), ir)
+ir = torch.from_numpy(ir).float().to(device)
+output = model(torch.unsqueeze(waveform, 0), torch.unsqueeze(ir, 0))
+print('distance prediction', torch.argmax(output[1], dim=1).detach().cpu().numpy())
+print('azimuth prediction', torch.argmax(output[2], dim=1).detach().cpu().numpy())
+print('elevation prediction', torch.argmax(output[3], dim=1).detach().cpu().numpy())
+
 
 print('done spatial ast')
