@@ -284,6 +284,12 @@ model = spatial_ast.__dict__['build_AST'](
     num_cls_tokens=3,
 )
 
+checkpoint = torch.load('https://huggingface.co/datasets/zhisheng01/SpatialAudio/blob/main/SpatialAST/finetuned.pth', map_location='cpu')
+print('Load pre-trained checkpoint')
+checkpoint_model = checkpoint['model']
+msg = model.load_state_dict(checkpoint_model, strict=False)
+print(msg)
+
 model.to(device)
 
 ir = torch.from_numpy(ir).float().to(device)
@@ -291,6 +297,5 @@ output = model(torch.unsqueeze(waveform, 0), torch.unsqueeze(ir, 0))
 print('distance prediction', torch.argmax(output[1], dim=1).detach().cpu().numpy())
 print('azimuth prediction', torch.argmax(output[2], dim=1).detach().cpu().numpy())
 print('elevation prediction', torch.argmax(output[3], dim=1).detach().cpu().numpy())
-
 
 print('done spatial ast')
