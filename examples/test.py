@@ -87,18 +87,18 @@ audio_sensor.setAudioMaterialsJSON("data/mp3d_material_config.json")
 #source_pos = sim.pathfinder.get_random_navigable_point()
 #print('Sample source location: ', source_pos)
 #source_pos = np.array([-7.9259,1.52,-2.8804])
-#source_pos = np.array([-8.2144,1.1012,-4.3399])
+source_pos = np.array([-8.2144,1.1012,-4.3399])
 #source_pos = np.array([-9.3071,1.9991,-2.8131])
-source_pos = np.array([-3.4029,0.9901,-0.1906])
+#source_pos = np.array([-3.4029,0.9901,-0.1906])
 
 #audio_sensor.setAudioSourceTransform(source_pos + np.array([0, 1.5, 0])) # add 1.5m to the height calculation 
 audio_sensor.setAudioSourceTransform(source_pos)
 agent = sim.get_agent(0)
 new_state = sim.get_agent(0).get_state()
 #new_state.position = sim.pathfinder.get_random_navigable_point_near(source_pos, 2)
-#new_state.position = np.array([-7.2797,0.0724,-2.0944])
+new_state.position = np.array([-7.2797,0.0724,-2.0944])
 #new_state.position = np.array([-7.5873,0.0724,-1.7346])
-new_state.position = np.array([-4.0593,0.0724,-0.311])
+#new_state.position = np.array([-4.0593,0.0724,-0.311])
 
 print('agent position', new_state.position)
 new_state.sensor_states = {}
@@ -325,8 +325,15 @@ plt.clf()
 plt.bar(np.arange(len(elevation_logits[0])), elevation_logits[0])
 plt.savefig(os.path.join('/content', 'output', 'elevation_logits'))
 
+dx = source_pos[0] - new_state.position[0] # LEFT-RIGHT
+dy = source_pos[1] - (new_state.position[1] + 1.5) # UP-DOWN
+dz = source_pos[2] - new_state.position[2] # FRONT-BACK
+
 print('distance prediction', np.argmax(distance_logits, axis=1))
 print('azimuth prediction', np.argmax(azimuth_logits, axis=1))
+azimuth_gt = math.degrees(math.atan2(-dz, dx))
+azimuth_gt = (round(azimuth_gt) + 360) % 360
+print('azimuth GT', azimuth_gt)
 print('elevation prediction', np.argmax(elevation_logits, axis=1))
 
 print('done spatial ast')
