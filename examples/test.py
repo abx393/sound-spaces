@@ -103,8 +103,7 @@ new_state.position = np.array([-7.2797,0.0724,-2.0944])
 print('agent position', new_state.position)
 new_state.sensor_states = {}
 agent.set_state(new_state, True)
-#ir = np.array(sim.get_sensor_observations()["audio_sensor"])
-ir = np.load('/content/drive/MyDrive/mp3d_reverb/binaural/17DRP5sb8fy/0.npy')
+ir = np.array(sim.get_sensor_observations()["audio_sensor"])
 print('ir shape', ir.shape)
 
 # check if the direct sound is present (source is visibile from the listener)
@@ -126,7 +125,14 @@ for i in range(2):
 
 plt.clf()
 
+plt.title('Impulse Response Precomputed')
+ir_precomputed = np.load('/content/drive/MyDrive/mp3d_reverb/binaural/17DRP5sb8fy/0.npy')
+for i in range(2):
+    plt.plot(np.linspace(0, samples_clip / sr, samples_clip), ir_precomputed[i, :samples_clip])
+    plt.savefig(os.path.join('/content', 'output', 'ir_precomputed{}'.format(i)))
 
+plt.clf()
+ir = ir_precomputed
 
 # convert input audio from stereo to mono
 sound = AudioSegment.from_wav('/content/drive/MyDrive/speech_navigation/follow_me.wav')
