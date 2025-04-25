@@ -60,7 +60,7 @@ sim = habitat_sim.Simulator(cfg)
 
 seed = random.randint(0, 100)
 print('seed', seed)
-sim.seed(seed)
+#sim.seed(seed)
 
 # set navmesh path for searching for navigable points
 if dataset == 'mp3d':
@@ -84,13 +84,22 @@ audio_sensor = sim.get_agent(0)._sensors["audio_sensor"]
 audio_sensor.setAudioMaterialsJSON("data/mp3d_material_config.json")
 
 # sampled navigable point is on the floor
-source_pos = sim.pathfinder.get_random_navigable_point()
-print('Sample source location: ', source_pos)
+#source_pos = sim.pathfinder.get_random_navigable_point()
+#print('Sample source location: ', source_pos)
+#source_pos = np.array([-7.9259,1.52,-2.8804])
+#source_pos = np.array([-8.2144,1.1012,-4.3399])
+#source_pos = np.array([-9.3071,1.9991,-2.8131])
+source_pos = np.array([-3.4029,0.9901,-0.1906])
 
-audio_sensor.setAudioSourceTransform(source_pos + np.array([0, 1.5, 0])) # add 1.5m to the height calculation 
+#audio_sensor.setAudioSourceTransform(source_pos + np.array([0, 1.5, 0])) # add 1.5m to the height calculation 
+audio_sensor.setAudioSourceTransform(source_pos)
 agent = sim.get_agent(0)
 new_state = sim.get_agent(0).get_state()
-new_state.position = sim.pathfinder.get_random_navigable_point_near(source_pos, 2)
+#new_state.position = sim.pathfinder.get_random_navigable_point_near(source_pos, 2)
+#new_state.position = np.array([-7.2797,0.0724,-2.0944])
+#new_state.position = np.array([-7.5873,0.0724,-1.7346])
+new_state.position = np.array([-4.0593,0.0724,-0.311])
+
 print('agent position', new_state.position)
 new_state.sensor_states = {}
 agent.set_state(new_state, True)
@@ -265,7 +274,7 @@ elif reverb_padding < 0:
     ir = ir[:, :32000 * 2]
 print('ir.shape after', ir.shape)
 
-normalize = False
+normalize = True
 waveform, sr = sf.read('/content/drive/MyDrive/speech_navigation/follow_me.wav')
 waveform = waveform[:, 0] if len(waveform.shape) > 1 else waveform
 waveform = signal.resample_poly(waveform, 32000, sr) if sr != 32000 else waveform   
@@ -296,8 +305,28 @@ waveform.to(device)
 ir.to(device)
 
 output = model(torch.unsqueeze(waveform, 0).cuda(), torch.unsqueeze(ir, 0).cuda())
-print('distance prediction', torch.argmax(output[1], dim=1).detach().cpu().numpy())
-print('azimuth prediction', torch.argmax(output[2], dim=1).detach().cpu().numpy())
-print('elevation prediction', torch.argmax(output[3], dim=1).detach().cpu().numpy())
+distance_logits = output[1].detach().cpu().numpy()
+azimuth_logits = output[2].detach().cpu().numpy()
+elevation_logits = output[3].detach().cpu().numpy()
+
+print('len(distance logits)', len(distance_logits[0]))
+print('len(azimuth logits)', len(azimuth_logits[0]))
+print('len(elevation logits)', len(elevation_logits[0]))
+
+plt.clf()
+plt.bar(np.arange(len(distance_logits[0])), distance_logits[0])
+plt.savefig(os.path.join('/content', 'output', 'distance_logits'))
+
+plt.clf()
+plt.bar(np.arange(len(azimuth_logits[0])), azimuth_logits[0])
+plt.savefig(os.path.join('/content', 'output', 'azimuth_logits'))
+
+plt.clf()
+plt.bar(np.arange(len(elevation_logits[0])), elevation_logits[0])
+plt.savefig(os.path.join('/content', 'output', 'elevation_logits'))
+
+print('distance prediction', np.argmax(distance_logits, axis=1))
+print('azimuth prediction', np.argmax(azimuth_logits, axis=1))
+print('elevation prediction', np.argmax(elevation_logits, axis=1))
 
 print('done spatial ast')
