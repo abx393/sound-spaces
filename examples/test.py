@@ -86,8 +86,8 @@ audio_sensor.setAudioMaterialsJSON("data/mp3d_material_config.json")
 # sampled navigable point is on the floor
 #source_pos = sim.pathfinder.get_random_navigable_point()
 #print('Sample source location: ', source_pos)
-#source_pos = np.array([-7.9259,1.52,-2.8804])
-source_pos = np.array([-8.2144,1.1012,-4.3399])
+source_pos = np.array([-7.9259,1.52,-2.8804])
+#source_pos = np.array([-8.2144,1.1012,-4.3399])
 #source_pos = np.array([-9.3071,1.9991,-2.8131])
 #source_pos = np.array([-3.4029,0.9901,-0.1906])
 
@@ -103,7 +103,8 @@ new_state.position = np.array([-7.2797,0.0724,-2.0944])
 print('agent position', new_state.position)
 new_state.sensor_states = {}
 agent.set_state(new_state, True)
-ir = np.array(sim.get_sensor_observations()["audio_sensor"])
+#ir = np.array(sim.get_sensor_observations()["audio_sensor"])
+ir = np.load('/content/drive/MyDrive/mp3d_reverb/binaural/17DRP5sb8fy/0.npy')
 print('ir shape', ir.shape)
 
 # check if the direct sound is present (source is visibile from the listener)
