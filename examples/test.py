@@ -1,7 +1,10 @@
 import os
 from re import I
 import quaternion
+import habitat_sim
 import habitat_sim.sim
+import habitat
+from habitat.tasks.nav.shortest_path_follower import ShortestPathFollower
 import numpy as np
 from scipy.io import wavfile
 import random
@@ -84,9 +87,9 @@ audio_sensor = sim.get_agent(0)._sensors["audio_sensor"]
 audio_sensor.setAudioMaterialsJSON("data/mp3d_material_config.json")
 
 # sampled navigable point is on the floor
-#source_pos = sim.pathfinder.get_random_navigable_point()
+source_pos = sim.pathfinder.get_random_navigable_point()
 #print('Sample source location: ', source_pos)
-source_pos = np.array([-7.9259,1.52,-2.8804])
+#source_pos = np.array([-7.9259,1.52,-2.8804])
 #source_pos = np.array([-8.2144,1.1012,-4.3399])
 #source_pos = np.array([-9.3071,1.9991,-2.8131])
 #source_pos = np.array([-3.4029,0.9901,-0.1906])
@@ -95,14 +98,47 @@ source_pos = np.array([-7.9259,1.52,-2.8804])
 audio_sensor.setAudioSourceTransform(source_pos)
 agent = sim.get_agent(0)
 new_state = sim.get_agent(0).get_state()
-#new_state.position = sim.pathfinder.get_random_navigable_point_near(source_pos, 2)
-new_state.position = np.array([-7.2797,0.0724,-2.0944])
+new_state.position = sim.pathfinder.get_random_navigable_point_near(source_pos, 6)
+#new_state.position = np.array([-7.2797,0.0724,-2.0944])
 #new_state.position = np.array([-7.5873,0.0724,-1.7346])
 #new_state.position = np.array([-4.0593,0.0724,-0.311])
 
 print('agent position', new_state.position)
 new_state.sensor_states = {}
 agent.set_state(new_state, True)
+
+class SimpleRLEnv(habitat.RLEnv):
+    def get_reward_range(self):
+        return [-1, 1]
+
+    def get_reward(self, observations):
+        return 0
+
+    def get_done(self, observations):
+        return self.habitat_env.episode_over
+
+    def get_info(self, observations):
+        return self.habitat_env.get_metrics()
+
+path = habitat_sim.ShortestPath()
+path.requested_start = new_state.position
+path.requested_end = source_pos
+
+if sim.pathfinder.find_path(path):
+    print('path points', path.points)
+
+config = habitat.get_config(
+    config_path="/content/sound-spaces/examples/pointnav_habitat_test.yaml"
+)
+
+with SimpleRLEnv(config=config) as env:
+    goal_radius = config.habitat.simulator.forward_step_size
+    follower = ShortestPathFollower(
+        sim, goal_radius, False
+    )
+
+print('follower best action', follower.get_next_action(source_pos))
+
 ir = np.array(sim.get_sensor_observations()["audio_sensor"])
 print('ir shape', ir.shape)
 
