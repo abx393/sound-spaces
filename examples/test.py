@@ -87,9 +87,9 @@ audio_sensor = sim.get_agent(0)._sensors["audio_sensor"]
 audio_sensor.setAudioMaterialsJSON("data/mp3d_material_config.json")
 
 # sampled navigable point is on the floor
-source_pos = sim.pathfinder.get_random_navigable_point()
+#source_pos = sim.pathfinder.get_random_navigable_point()
 #print('Sample source location: ', source_pos)
-#source_pos = np.array([-7.9259,1.52,-2.8804])
+source_pos = np.array([-7.9259,1.52,-2.8804])
 #source_pos = np.array([-8.2144,1.1012,-4.3399])
 #source_pos = np.array([-9.3071,1.9991,-2.8131])
 #source_pos = np.array([-3.4029,0.9901,-0.1906])
@@ -98,8 +98,8 @@ source_pos = sim.pathfinder.get_random_navigable_point()
 audio_sensor.setAudioSourceTransform(source_pos)
 agent = sim.get_agent(0)
 new_state = sim.get_agent(0).get_state()
-new_state.position = sim.pathfinder.get_random_navigable_point_near(source_pos, 6)
-#new_state.position = np.array([-7.2797,0.0724,-2.0944])
+#new_state.position = sim.pathfinder.get_random_navigable_point_near(source_pos, 6)
+new_state.position = np.array([-7.2797,0.0724,-2.0944])
 #new_state.position = np.array([-7.5873,0.0724,-1.7346])
 #new_state.position = np.array([-4.0593,0.0724,-0.311])
 
@@ -127,6 +127,21 @@ path.requested_end = source_pos
 if sim.pathfinder.find_path(path):
     print('path points', path.points)
 
+follower = habitat_sim.nav.GreedyGeodesicFollower(
+        sim.pathfinder,
+        agent
+)
+
+path_points = []
+while True:
+    path_points.append(agent.get_state().position)
+    next_action = follower.next_action_along(source_pos)
+    if next_action is None:
+        break
+    print('next action', next_action)
+    sim.step(next_action)
+
+"""
 config = habitat.get_config(
     config_path="/content/sound-spaces/examples/pointnav_habitat_test.yaml"
 )
@@ -138,6 +153,7 @@ with SimpleRLEnv(config=config) as env:
     )
 
     print('follower best action', follower.get_next_action(source_pos))
+"""
 
 ir = np.array(sim.get_sensor_observations()["audio_sensor"])
 print('ir shape', ir.shape)
@@ -213,100 +229,6 @@ print(f'RT60 of the rendered IR is {rt60:.4f} seconds')
 action_names = list(cfg.agents[0].action_space.keys())
 print('action names', action_names)
 
-# convert 3d points to 2d topdown pixel coordinates
-def convert_points_to_topdown_pixel_coordinates(pathfinder, points, meters_per_pixel):
-    points_topdown = []
-    bounds = pathfinder.get_bounds()
-    for point in points:
-        # convert 3D x,z to topdown x,y
-        px = (point[0] - bounds[0][0]) / meters_per_pixel
-        py = (point[2] - bounds[0][2]) / meters_per_pixel
-        points_topdown.append(np.array([px, py]))
-    return points_topdown
-
-
-# display a topdown map with matplotlib
-def display_map(topdown_map, out_file, source_pos=None, agent_pos=None, agent_angle=None):
-    plt.figure(figsize=(12, 8))
-    ax = plt.subplot(1, 1, 1)
-    #ax.axis("off")
-    plt.imshow(topdown_map)
-    # plot points on map
-    if source_pos is not None:
-        plt.plot(source_pos[0], source_pos[1], marker="o", markersize=10, alpha=0.8)
-    if agent_pos is not None:
-        plt.plot(agent_pos[0], agent_pos[1], marker="o", markersize=10, alpha=0.8)
-    if agent_angle is not None:
-        arrow_len = 50
-        arrow_dest = (agent_pos[0] + arrow_len * math.sin(agent_angle), agent_pos[1] - arrow_len * math.cos(agent_angle))
-        ax.annotate('', xytext=agent_pos, xy=arrow_dest, arrowprops=dict(arrowstyle="->"))
-
-
-    #plt.show(block=False)
-    plt.savefig(os.path.join('/content', 'output', out_file))
-
-def quaternion_to_axis_angle(quat):
-    q_array = np.array([quat.x, quat.y, quat.z, quat.w])
-    rotation = R.from_quat(q_array)
-    
-    # Get the axis-angle representation
-    axis_angle = rotation.as_rotvec()
-    
-    # Calculate the angle from the magnitude of the rotation vector
-    angle = np.linalg.norm(axis_angle)
-    
-    # Normalize the rotation vector to get the axis
-    if angle != 0:
-        axis = axis_angle / angle
-    else:
-        axis = np.array([1.0, 0.0, 0.0])  # Handle zero rotation case
-
-    return axis, angle
-
-meters_per_pixel = 0.01  # @param {type:"slider", min:0.01, max:1.0, step:0.01}
-# @markdown Customize the map slice height (global y coordinate):
-custom_height = False  # @param {type:"boolean"}
-height = 1
-
-bounds = sim.pathfinder.get_bounds()
-print("The NavMesh bounds are: " + str(bounds))
-if not custom_height:
-    # get bounding box minimum elevation for automatic height
-    height = sim.pathfinder.get_bounds()[0][1]
-
-if not sim.pathfinder.is_loaded:
-    print("Pathfinder not initialized, aborting.")
-else:
-    # @markdown You can get the topdown map directly from the Habitat-sim API with *PathFinder.get_topdown_view*.
-    # This map is a 2D boolean array
-    sim_topdown_map = sim.pathfinder.get_topdown_view(meters_per_pixel, height)
-    
-    # @markdown Alternatively, you can process the map using the Habitat-Lab [maps module](https://github.com/facebookresearch/habitat-lab/blob/main/habitat/utils/visualizations/maps.py)
-    hablab_topdown_map = maps.get_topdown_map(
-        sim.pathfinder, height, meters_per_pixel=meters_per_pixel
-    )
-    recolor_map = np.array(
-        [[255, 255, 255], [128, 128, 128], [0, 0, 0]], dtype=np.uint8
-    )
-    hablab_topdown_map = recolor_map[hablab_topdown_map]
-
-    agent_rot_quat = agent.get_state().rotation
-    agent_pos = agent.get_state().position
-    pos_pixels = convert_points_to_topdown_pixel_coordinates(sim.pathfinder, [source_pos, agent_pos], meters_per_pixel)
-    print('source position', source_pos)
-    print('agent position', agent_pos)
-    print('agent rotation quaternion', agent_rot_quat)
-    rot_axis, rot_angle = quaternion_to_axis_angle(agent_rot_quat)
-    print('rot_axis', rot_axis)
-    print('rot_angle', rot_angle)
-    print('source and agent pixel positions', pos_pixels)
-
-    print("Displaying the raw map from get_topdown_view:")
-    display_map(sim_topdown_map, 'habitat_sim_get_topdown_view', source_pos=pos_pixels[0], agent_pos=pos_pixels[1], agent_angle=rot_angle)
-    print("Displaying the map from the Habitat-Lab maps module:")
-    display_map(hablab_topdown_map, 'habitat_lab_get_topdown_map', source_pos=pos_pixels[0], agent_pos=pos_pixels[1], agent_angle=rot_angle)
-    
-
 print('reverb padding start')
 print('ir.shape before', ir.shape)
 reverb_padding = 32000 * 2 - ir.shape[1]
@@ -372,11 +294,116 @@ dx = source_pos[0] - new_state.position[0] # LEFT-RIGHT
 dy = source_pos[1] - (new_state.position[1] + 1.5) # UP-DOWN
 dz = source_pos[2] - new_state.position[2] # FRONT-BACK
 
-print('distance prediction', np.argmax(distance_logits, axis=1))
-print('azimuth prediction', np.argmax(azimuth_logits, axis=1))
+dist_pred = np.argmax(distance_logits, axis=1) * 0.5
+azimuth_pred = np.argmax(azimuth_logits, axis=1)
+print('distance prediction', dist_pred)
+print('azimuth prediction', azimuth_pred)
 azimuth_gt = math.degrees(math.atan2(-dz, dx))
 azimuth_gt = (round(azimuth_gt) + 360) % 360
 print('azimuth GT', azimuth_gt)
-print('elevation prediction', np.argmax(elevation_logits, axis=1))
+elevation_pred = np.argmax(elevation_logits, axis=1)
+print('elevation prediction', elevation_pred)
+
+slope = math.tan(math.radians())
 
 print('done spatial ast')
+
+# convert 3d points to 2d topdown pixel coordinates
+def convert_points_to_topdown_pixel_coordinates(pathfinder, points, meters_per_pixel):
+    points_topdown = []
+    bounds = pathfinder.get_bounds()
+    for point in points:
+        # convert 3D x,z to topdown x,y
+        px = (point[0] - bounds[0][0]) / meters_per_pixel
+        py = (point[2] - bounds[0][2]) / meters_per_pixel
+        points_topdown.append(np.array([px, py]))
+    return points_topdown
+
+
+# display a topdown map with matplotlib
+def display_map(topdown_map, out_file, source_pos=None, agent_pos=None, agent_angle=None, path_points=None):
+    plt.figure(figsize=(12, 8))
+    ax = plt.subplot(1, 1, 1)
+    #ax.axis("off")
+    plt.imshow(topdown_map)
+    # plot points on map
+    if source_pos is not None:
+        plt.plot(source_pos[0], source_pos[1], marker="o", markersize=10, alpha=0.8)
+    if agent_pos is not None:
+        plt.plot(agent_pos[0], agent_pos[1], marker="o", markersize=10, alpha=0.8)
+    if path_points is not None:
+        for point in path_points:
+            plt.plot(point[0], point[1], marker="o", markersize=10, alpha=0.8)
+
+    if agent_angle is not None:
+        arrow_len = 50
+        arrow_dest = (agent_pos[0] + arrow_len * math.sin(agent_angle), agent_pos[1] - arrow_len * math.cos(agent_angle))
+        ax.annotate('', xytext=agent_pos, xy=arrow_dest, arrowprops=dict(arrowstyle="->"))
+
+
+    #plt.show(block=False)
+    plt.savefig(os.path.join('/content', 'output', out_file))
+
+def quaternion_to_axis_angle(quat):
+    q_array = np.array([quat.x, quat.y, quat.z, quat.w])
+    rotation = R.from_quat(q_array)
+    
+    # Get the axis-angle representation
+    axis_angle = rotation.as_rotvec()
+    
+    # Calculate the angle from the magnitude of the rotation vector
+    angle = np.linalg.norm(axis_angle)
+    
+    # Normalize the rotation vector to get the axis
+    if angle != 0:
+        axis = axis_angle / angle
+    else:
+        axis = np.array([1.0, 0.0, 0.0])  # Handle zero rotation case
+
+    return axis, -angle
+
+meters_per_pixel = 0.01  # @param {type:"slider", min:0.01, max:1.0, step:0.01}
+# @markdown Customize the map slice height (global y coordinate):
+custom_height = False  # @param {type:"boolean"}
+height = 1
+
+bounds = sim.pathfinder.get_bounds()
+print("The NavMesh bounds are: " + str(bounds))
+if not custom_height:
+    # get bounding box minimum elevation for automatic height
+    height = sim.pathfinder.get_bounds()[0][1]
+
+if not sim.pathfinder.is_loaded:
+    print("Pathfinder not initialized, aborting.")
+else:
+    # @markdown You can get the topdown map directly from the Habitat-sim API with *PathFinder.get_topdown_view*.
+    # This map is a 2D boolean array
+    sim_topdown_map = sim.pathfinder.get_topdown_view(meters_per_pixel, height)
+    
+    # @markdown Alternatively, you can process the map using the Habitat-Lab [maps module](https://github.com/facebookresearch/habitat-lab/blob/main/habitat/utils/visualizations/maps.py)
+    hablab_topdown_map = maps.get_topdown_map(
+        sim.pathfinder, height, meters_per_pixel=meters_per_pixel
+    )
+    recolor_map = np.array(
+        [[255, 255, 255], [128, 128, 128], [0, 0, 0]], dtype=np.uint8
+    )
+    hablab_topdown_map = recolor_map[hablab_topdown_map]
+
+    agent_rot_quat = agent.get_state().rotation
+    agent_pos = agent.get_state().position
+    all_points = path_points + [agent_pos, predicted_pos, source_pos]
+    pos_pixels = convert_points_to_topdown_pixel_coordinates(sim.pathfinder, all_points, meters_per_pixel)
+    print('source position', source_pos)
+    print('agent position', agent_pos)
+    print('agent rotation quaternion', agent_rot_quat)
+    rot_axis, rot_angle = quaternion_to_axis_angle(agent_rot_quat)
+    print('rot_axis', rot_axis)
+    print('rot_angle', rot_angle)
+    print('source and agent pixel positions', pos_pixels)
+
+    print("Displaying the raw map from get_topdown_view:")
+    display_map(sim_topdown_map, 'habitat_sim_get_topdown_view', source_pos=pos_pixels[-1], predicted_pos=pos_pixels[-2], agent_pos=pos_pixels[-3], agent_angle=rot_angle, path_points=pos_pixels[:-3])
+    print("Displaying the map from the Habitat-Lab maps module:")
+    display_map(hablab_topdown_map, 'habitat_lab_get_topdown_map', source_pos=pos_pixels[-1], predicted_pos=pos_pixels[-2], agent_pos=pos_pixels[-3], agent_angle=rot_angle, path_points=pos_pixels[:-3])
+    
+
