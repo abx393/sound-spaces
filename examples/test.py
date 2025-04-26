@@ -137,7 +137,7 @@ with SimpleRLEnv(config=config) as env:
         sim, goal_radius, False
     )
 
-print('follower best action', follower.get_next_action(source_pos))
+    print('follower best action', follower.get_next_action(source_pos))
 
 ir = np.array(sim.get_sensor_observations()["audio_sensor"])
 print('ir shape', ir.shape)
