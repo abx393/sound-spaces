@@ -40,7 +40,7 @@ def normalize_audio(audio_data, target_dBFS=-14.0):
     normalized_audio = audio_data * gain_linear # Apply the gain to the audio data
     return normalized_audio
 
-def run_spatial_ast(ir):
+def run_spatial_ast(ir, scene_id, setup_id):
     print('reverb padding start')
     print('ir.shape before', ir.shape)
     reverb_padding = 32000 * 2 - ir.shape[1]
@@ -88,15 +88,15 @@ def run_spatial_ast(ir):
 
     plt.clf()
     plt.bar(np.arange(len(distance_logits[0])), distance_logits[0])
-    plt.savefig(os.path.join('/content', 'output', 'distance_logits'))
+    plt.savefig(os.path.join('/content/drive/MyDrive/spoken_navigation_output', scene_id, setup_id, 'distance_logits'))
 
     plt.clf()
     plt.bar(np.arange(len(azimuth_logits[0])), azimuth_logits[0])
-    plt.savefig(os.path.join('/content', 'output', 'azimuth_logits'))
+    plt.savefig(os.path.join('/content/drive/MyDrive/spoken_navigation_output', scene_id, setup_id, 'azimuth_logits'))
 
     plt.clf()
     plt.bar(np.arange(len(elevation_logits[0])), elevation_logits[0])
-    plt.savefig(os.path.join('/content', 'output', 'elevation_logits'))
+    plt.savefig(os.path.join('/content/drive/MyDrive/spoken_navigation_output', scene_id, setup_id, 'elevation_logits'))
 
     agent_pos = agent.get_state().position
     print('agent_pos', agent_pos)
@@ -171,7 +171,7 @@ def convert_points_to_topdown_pixel_coordinates(pathfinder, points, meters_per_p
 
 
 # display a topdown map with matplotlib
-def display_map(topdown_map, out_file, scene_id, source_pos=None, agent_pos=None, goal_pos=None, agent_angle=None, path_points=None):
+def display_map(topdown_map, out_file, scene_id, setup_id, source_pos=None, agent_pos=None, goal_pos=None, agent_angle=None, path_points=None):
     plt.figure(figsize=(12, 8))
     ax = plt.subplot(1, 1, 1)
     #ax.axis("off")
@@ -195,7 +195,7 @@ def display_map(topdown_map, out_file, scene_id, source_pos=None, agent_pos=None
 
     #plt.show(block=False)
     #plt.set_xticks([1,2,3,4])
-    plt.savefig(os.path.join('/content', 'drive', 'spoken_navigation_output', scene_id, out_file))
+    plt.savefig(os.path.join('/content/drive/MyDrive/spoken_navigation_output', scene_id, setup_id, out_file))
 
 def quaternion_to_axis_angle(quat):
     q_array = np.array([quat.x, quat.y, quat.z, quat.w])
@@ -221,6 +221,7 @@ device = torch.device('cuda')
 os.chdir('/content/sound-spaces')
 os.makedirs('/content/output', exist_ok=True)
 dataset = 'mp3d'
+scene_id = '17DRP5sb8fy'
 
 backend_cfg = habitat_sim.SimulatorConfiguration()
 backend_cfg.scene_id = f"data/scene_datasets/mp3d/{scene_id}/{scene_id}.glb"
@@ -252,7 +253,6 @@ audio_sensor.setAudioMaterialsJSON("data/mp3d_material_config.json")
 #sim.seed(seed)
 
 # set navmesh path for searching for navigable points
-scene_id = '17DRP5sb8fy'
 sim.pathfinder.load_nav_mesh(os.path.join(f"data/scene_datasets/mp3d/{scene_id}/{scene_id}.navmesh"))
 
 reverb_config = json.load(open('/content/drive/MyDrive/mp3d_reverb/train_reverberation.json'))
@@ -260,9 +260,10 @@ for scene_config in reverb_config['data']:
     if not scene_config['fname'].startswith(scene_id):
         continue
 
-    scene_id = scene_config['fname'].split('/')[-1].split('.')[0]
+    setup_id = scene_config['fname'].split('/')[-1].split('.')[0]
     print('scene_id', scene_id)
-    os.makedirs(os.path.join('/content', 'drive', 'spoken_navigation_output', scene_id), exist_ok=True)
+    print('setup_id', setup_id)
+    os.makedirs(os.path.join('/content/drive/MyDrive/spoken_navigation_output', scene_id, setup_id), exist_ok=True)
 
     #try:
     fname = f'/content/drive/MyDrive/mp3d_reverb/binaural/{scene_config["fname"]}'
@@ -352,7 +353,6 @@ for scene_config in reverb_config['data']:
     #convolved_vocal = convolved_vocal / np.expand_dims(np.max(convolved_vocal, axis=1), axis=1)
     iinfo = np.iinfo(np.int16)
     convolved_vocal = (convolved_vocal / np.max(np.abs(convolved_vocal)) * iinfo.max).astype(np.int16)
-    os.makedirs('/content/output/', exist_ok=True)
     wavfile.write(os.path.join('/content/drive/MyDrive/spoken_navigation_output', scene_id, setup_id, 'reverberent_speech.wav'), sr, convolved_vocal.T)
 
     rt60 = measure_rt60(ir[0], sr, decay_db=30, plot=True)
@@ -362,7 +362,7 @@ for scene_config in reverb_config['data']:
     print('action names', action_names)
 
 
-    dist_pred, elevation_pred, azimuth_pred = run_spatial_ast(ir)
+    dist_pred, elevation_pred, azimuth_pred = run_spatial_ast(ir, scene_id, setup_id)
 
     agent_pos = agent.get_state().position
     goal_pos = dist_angle_to_cartesian(agent_pos, dist_pred, elevation_pred, azimuth_pred)
@@ -383,38 +383,36 @@ for scene_config in reverb_config['data']:
         # get bounding box minimum elevation for automatic height
         height = sim.pathfinder.get_bounds()[0][1]
 
-    if not sim.pathfinder.is_loaded:
-        print("Pathfinder not initialized, aborting.")
-    else:
-        # @markdown You can get the topdown map directly from the Habitat-sim API with *PathFinder.get_topdown_view*.
-        # This map is a 2D boolean array
-        sim_topdown_map = sim.pathfinder.get_topdown_view(meters_per_pixel, height)
-        
-        # @markdown Alternatively, you can process the map using the Habitat-Lab [maps module](https://github.com/facebookresearch/habitat-lab/blob/main/habitat/utils/visualizations/maps.py)
-        hablab_topdown_map = maps.get_topdown_map(
-            sim.pathfinder, height, meters_per_pixel=meters_per_pixel
-        )
-        recolor_map = np.array(
-            [[255, 255, 255], [128, 128, 128], [0, 0, 0]], dtype=np.uint8
-        )
-        hablab_topdown_map = recolor_map[hablab_topdown_map]
 
-        agent_rot_quat = agent.get_state().rotation
-        agent_pos = agent.get_state().position
-        all_points = path_points + [agent_pos, goal_pos, source_pos]
-        pos_pixels = convert_points_to_topdown_pixel_coordinates(sim.pathfinder, all_points, meters_per_pixel)
-        print('source position', source_pos)
-        print('agent position', agent_pos)
-        print('agent rotation quaternion', agent_rot_quat)
-        rot_axis, rot_angle = quaternion_to_axis_angle(agent_rot_quat)
-        print('rot_axis', rot_axis)
-        print('rot_angle', rot_angle)
-        print('source and agent pixel positions', pos_pixels)
+    # @markdown You can get the topdown map directly from the Habitat-sim API with *PathFinder.get_topdown_view*.
+    # This map is a 2D boolean array
+    sim_topdown_map = sim.pathfinder.get_topdown_view(meters_per_pixel, height)
+    
+    # @markdown Alternatively, you can process the map using the Habitat-Lab [maps module](https://github.com/facebookresearch/habitat-lab/blob/main/habitat/utils/visualizations/maps.py)
+    hablab_topdown_map = maps.get_topdown_map(
+        sim.pathfinder, height, meters_per_pixel=meters_per_pixel
+    )
+    recolor_map = np.array(
+        [[255, 255, 255], [128, 128, 128], [0, 0, 0]], dtype=np.uint8
+    )
+    hablab_topdown_map = recolor_map[hablab_topdown_map]
 
-        #print("Displaying the raw map from get_topdown_view:")
-        #display_map(sim_topdown_map, 'habitat_sim_get_topdown_view', scene_id, source_pos=pos_pixels[-1], goal_pos=pos_pixels[-2], agent_pos=pos_pixels[-3], agent_angle=rot_angle, path_points=pos_pixels[:-3])
-        print("Displaying the map from the Habitat-Lab maps module:")
-        display_map(hablab_topdown_map, 'habitat_lab_get_topdown_map', scene_id, source_pos=pos_pixels[-1], goal_pos=pos_pixels[-2], agent_pos=pos_pixels[-3], agent_angle=rot_angle, path_points=pos_pixels[:-3])
+    agent_rot_quat = agent.get_state().rotation
+    agent_pos = agent.get_state().position
+    all_points = path_points + [agent_pos, goal_pos, source_pos]
+    pos_pixels = convert_points_to_topdown_pixel_coordinates(sim.pathfinder, all_points, meters_per_pixel)
+    print('source position', source_pos)
+    print('agent position', agent_pos)
+    print('agent rotation quaternion', agent_rot_quat)
+    rot_axis, rot_angle = quaternion_to_axis_angle(agent_rot_quat)
+    print('rot_axis', rot_axis)
+    print('rot_angle', rot_angle)
+    print('source and agent pixel positions', pos_pixels)
+
+    #print("Displaying the raw map from get_topdown_view:")
+    #display_map(sim_topdown_map, 'habitat_sim_get_topdown_view', scene_id, setup_id, source_pos=pos_pixels[-1], goal_pos=pos_pixels[-2], agent_pos=pos_pixels[-3], agent_angle=rot_angle, path_points=pos_pixels[:-3])
+    print("Displaying the map from the Habitat-Lab maps module:")
+    display_map(hablab_topdown_map, 'habitat_lab_get_topdown_map', scene_id, setup_id, source_pos=pos_pixels[-1], goal_pos=pos_pixels[-2], agent_pos=pos_pixels[-3], agent_angle=rot_angle, path_points=pos_pixels[:-3])
 
     #except:
     #    print('error loading config', scene_config['fname'])
