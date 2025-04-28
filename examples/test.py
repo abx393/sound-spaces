@@ -420,7 +420,7 @@ for scene_config in reverb_config['data']:
     print('agent rotation quaternion', agent_rot_quat)
     rot_axis, rot_angle = quaternion_to_axis_angle(agent_rot_quat)
     print('rot_axis', rot_axis)
-    print('rot_angle', rot_angle)
+    print('rot_angle degrees ', math.degrees(rot_angle))
     print('source and agent pixel positions', pos_pixels)
 
     #print("Displaying the raw map from get_topdown_view:")
