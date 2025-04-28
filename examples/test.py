@@ -86,17 +86,6 @@ def run_spatial_ast(ir, scene_id, setup_id):
     azimuth_logits = output[2].detach().cpu().numpy()
     elevation_logits = output[3].detach().cpu().numpy()
 
-    plt.clf()
-    plt.bar(np.arange(len(distance_logits[0])), distance_logits[0])
-    plt.savefig(os.path.join('/content/drive/MyDrive/spoken_navigation_output', scene_id, setup_id, 'distance_logits'))
-
-    plt.clf()
-    plt.bar(np.arange(len(azimuth_logits[0])), azimuth_logits[0])
-    plt.savefig(os.path.join('/content/drive/MyDrive/spoken_navigation_output', scene_id, setup_id, 'azimuth_logits'))
-
-    plt.clf()
-    plt.bar(np.arange(len(elevation_logits[0])), elevation_logits[0])
-    plt.savefig(os.path.join('/content/drive/MyDrive/spoken_navigation_output', scene_id, setup_id, 'elevation_logits'))
 
     agent_pos = agent.get_state().position
     print('agent_pos', agent_pos)
@@ -106,6 +95,8 @@ def run_spatial_ast(ir, scene_id, setup_id):
     dy = source_pos[1] - (agent_pos[1] + 1.5) # UP-DOWN
     dz = source_pos[2] - agent_pos[2] # FRONT-BACK
 
+    distance_gt = np.sqrt(dx ** 2 + dy ** 2 + dz ** 2)
+    print('distance GT', distance_gt)
     dist_pred = np.argmax(distance_logits, axis=1)[0] * 0.5
     azimuth_pred = np.argmax(azimuth_logits, axis=1)[0]
     print('distance prediction', dist_pred)
@@ -115,6 +106,26 @@ def run_spatial_ast(ir, scene_id, setup_id):
     print('azimuth GT', azimuth_gt)
     elevation_pred = np.argmax(elevation_logits, axis=1)[0]
     print('elevation prediction', elevation_pred)
+
+    plt.clf()
+    plt.title('Sound Distance Estimation')
+    plt.bar(np.arange(len(distance_logits[0])), distance_logits[0])
+    plt.plot(distance_gt, np.max(distance_logits[0]) * 1.5, 'go', markersize=15)
+    plt.legend(['Distance Prediction Logits', 'Ground Truth Distance'])
+    plt.savefig(os.path.join('/content/drive/MyDrive/spoken_navigation_output', scene_id, setup_id, 'distance_logits'))
+
+    plt.clf()
+    plt.title('Sound Azimuth Estimation')
+    plt.bar(np.arange(len(azimuth_logits[0])), azimuth_logits[0])
+    plt.plot(distance_gt, np.max(distance_logits[0]) * 1.5, 'go', markersize=10)
+    plt.legend(['Azimuth Prediction Logits', 'Ground Truth Azimuth'])
+    plt.savefig(os.path.join('/content/drive/MyDrive/spoken_navigation_output', scene_id, setup_id, 'azimuth_logits'))
+
+    plt.clf()
+    plt.title('Sound Elevation Estimation')
+    plt.bar(np.arange(len(elevation_logits[0])), elevation_logits[0])
+    plt.savefig(os.path.join('/content/drive/MyDrive/spoken_navigation_output', scene_id, setup_id, 'elevation_logits'))
+
     return dist_pred, elevation_pred, azimuth_pred
 
 def get_shortest_path(sim, agent, goal_pos):
@@ -198,7 +209,7 @@ def display_map(topdown_map, out_file, scene_id, setup_id, source_pos=None, agen
 
     #plt.show(block=False)
     #plt.set_xticks([1,2,3,4])
-    plt.savefig(os.path.join('/content/drive/MyDrive/spoken_navigation_output', scene_id, setup_id, out_file))
+    plt.savefig(os.path.join('/content/drive/MyDrive/spoken_navigation_output', scene_id, setup_id, out_file), bbox_inches='tight')
 
 def quaternion_to_axis_angle(quat):
     q_array = np.array([quat.x, quat.y, quat.z, quat.w])
