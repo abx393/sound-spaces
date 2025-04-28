@@ -179,13 +179,16 @@ def display_map(topdown_map, out_file, scene_id, setup_id, source_pos=None, agen
     # plot points on map
     if source_pos is not None:
         plt.plot(source_pos[0], source_pos[1], "go", markersize=10, alpha=0.8)
+        plt.legend('Ground Truth Speech Source Position')
     if agent_pos is not None:
         plt.plot(agent_pos[0], agent_pos[1], "ro", markersize=10, alpha=0.8)
+        plt.legend('Agent End Position')
     if goal_pos is not None:
         plt.plot(goal_pos[0], goal_pos[1], "bo", markersize=10, alpha=0.8)
+        plt.legend('Estimated Sound Source Position')
     if path_points is not None:
-        for point in path_points:
-            plt.plot(point[0], point[1], "ro", markersize=5, alpha=0.8)
+        plt.plot([point[0] for point in path_points], [point[1] for point in path_points], "ro", markersize=5, alpha=0.8)
+        plt.legend('Agent Steps')
 
     if agent_angle is not None:
         arrow_len = 50
