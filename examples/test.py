@@ -55,7 +55,7 @@ def run_spatial_ast(ir, scene_id, setup_id):
     print('ir.shape after', ir.shape)
 
     normalize = True
-    waveform, sr = sf.read('/content/Spatial-AST/res/singing.wav')
+    waveform, sr = sf.read('/content/sound-spaces/res/singing.wav')
     #waveform, sr = sf.read('/content/drive/MyDrive/speech_navigation/follow_me.wav')
     waveform = waveform[:, 0] if len(waveform.shape) > 1 else waveform
     waveform = signal.resample_poly(waveform, 32000, sr) if sr != 32000 else waveform
@@ -75,7 +75,7 @@ def run_spatial_ast(ir, scene_id, setup_id):
         num_cls_tokens=3,
     )
 
-    checkpoint = torch.load('/content/drive/MyDrive/data_and_checkpoints/finetuned.pth', map_location='cpu')
+    checkpoint = torch.load('/content/drive/MyDrive/finetuned.pth', map_location='cpu')
     print('Load pre-trained checkpoint')
     checkpoint_model = checkpoint['model']
     msg = model.load_state_dict(checkpoint_model, strict=False)
@@ -361,7 +361,7 @@ for scene_config in reverb_config['data']:
     ir = ir_precomputed
 
     # convert input audio from stereo to mono
-    sound = AudioSegment.from_wav('/content/Spatial-AST/res/singing.wav')
+    sound = AudioSegment.from_wav('/content/sound-spaces/res/singing.wav')
     #sound = AudioSegment.from_wav('/content/drive/MyDrive/speech_navigation/follow_me.wav')
     sound = sound.set_channels(1)
     sound.export("/content/singing.wav", format="wav")
