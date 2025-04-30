@@ -74,7 +74,7 @@ def run_spatial_ast(ir, scene_id, setup_id):
         num_cls_tokens=3,
     )
 
-    checkpoint = torch.load('/content/drive/MyDrive/finetuned.pth', map_location='cpu')
+    checkpoint = torch.load('/content/drive/MyDrive/data_and_checkpoints/checkpoint-16.pth', map_location='cpu')
     print('Load pre-trained checkpoint')
     checkpoint_model = checkpoint['model']
     msg = model.load_state_dict(checkpoint_model, strict=False)
