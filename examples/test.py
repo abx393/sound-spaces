@@ -112,13 +112,16 @@ def run_spatial_ast(ir, scene_id, setup_id):
     azimuth_gt = (round(azimuth_gt) + 360) % 360
     print('azimuth GT', azimuth_gt)
     elevation_pred = np.argmax(elevation_logits, axis=1)[0]
-    elevation_pred = 25
+    elevation_gt = math.degrees(math.atan(dy / math.sqrt(dx**2 + dz**2)))
+    elevation_gt = (round(elevation_gt) + 90) % 180
+    #elevation_pred = 25
     print('elevation prediction', elevation_pred)
+    print('elevation GT', elevation_gt)
 
     plt.clf()
     plt.title('Sound Distance Estimation')
     plt.bar(np.arange(0, len(distance_logits[0]) / 2, 0.5), distance_logits[0], width=0.3)
-    plt.vlines(distance_gt, -5, 5, colors='green')
+    plt.vlines(distance_gt, abs(min(distance_logits[0])) * -1.25, max(distance_logits[0]) * 1.25, colors='green')
     #plt.plot(distance_gt, np.max(distance_logits[0]) * 1.5, 'go', markersize=15)
     plt.legend(['Ground Truth Distance', 'Distance Prediction Logits'])
     plt.xlabel('Distance (m)')
@@ -127,7 +130,7 @@ def run_spatial_ast(ir, scene_id, setup_id):
     plt.clf()
     plt.title('Sound Azimuth Estimation')
     plt.bar(np.arange(len(azimuth_logits[0])), azimuth_logits[0], width=0.3)
-    plt.vlines(azimuth_gt, -5, 5, colors='green')
+    plt.vlines(azimuth_gt, abs(min(azimuth_logits[0])) * -1.25, max(azimuth_logits[0]) * 1.25, colors='green')
     #plt.plot(azimuth_gt, np.max(azimuth_logits[0]) * 1.5, 'go', markersize=10)
     plt.legend(['Ground Truth Azimuth', 'Azimuth Prediction Logits'])
     plt.xlabel('Angle (Degrees)')
@@ -136,6 +139,9 @@ def run_spatial_ast(ir, scene_id, setup_id):
     plt.clf()
     plt.title('Sound Elevation Estimation')
     plt.bar(np.arange(len(elevation_logits[0])), elevation_logits[0], width=0.3)
+    plt.vlines(elevation_gt, abs(min(elevation_logits[0])) * -1.25, max(elevation_logits[0]) * 1.25, colors='green')
+    plt.legend(['Ground Truth Elevation', 'Elevation Prediction Logits'])
+    
     plt.xlabel('Angle (Degrees)')
     plt.savefig(os.path.join('/content/drive/MyDrive/speech_navigation_output', scene_id, setup_id, ir_type, 'elevation_logits'))
 
@@ -286,7 +292,10 @@ audio_sensor.setAudioMaterialsJSON("data/mp3d_material_config.json")
 # sim.seed(seed)
 
 azimuth_in_range = 0
-distance_in_range = 0
+azimuth_error_sum = 0
+dist_in_range = 0
+dist_error_sum = 0
+azimuth_success_cnt = 0
 total_cnt = 0
 # set navmesh path for searching for navigable points
 sim.pathfinder.load_nav_mesh(os.path.join(f"data/scene_datasets/mp3d/{scene_id}/{scene_id}.navmesh"))
@@ -347,7 +356,7 @@ for scene_config in reverb_config['data']:
     print('ray efficiency', audio_sensor.getRayEfficiency())
 
     # plot the waveform of IR and show the audio
-    sr = 48000
+    sr = 32000
     samples_clip = 10000
     plt.title('Impulse Response')
     for i in range(2):
@@ -411,12 +420,16 @@ for scene_config in reverb_config['data']:
     print('action names', action_names)
 
     dist_pred, elevation_pred, azimuth_pred, dist_gt, azimuth_gt = run_spatial_ast(ir, scene_id, setup_id)
-    if abs(azimuth_gt - azimuth_pred) <= 20:
+    azimuth_error = min(abs(azimuth_gt - azimuth_pred), 360 - abs(azimuth_gt - azimuth_pred))
+    dist_error = abs(dist_gt - dist_pred)
+    if azimuth_error <= 20:
         azimuth_in_range += 1
-    if abs(dist_gt - dist_pred) <= 1:
-        distance_in_range += 1
+    if dist_error <= 1:
+        dist_in_range += 1
+    azimuth_error_sum += azimuth_error
+    distance_error_sum += dist_error
     print('azimuth_in_range', azimuth_in_range)
-    print('distance_in_range', distance_in_range)
+    print('dist_in_range', dist_in_range)
     print('total count', total_cnt)
 
     agent_pos = agent.get_state().position
@@ -470,3 +483,14 @@ for scene_config in reverb_config['data']:
 
     # except:
     #    print('error loading config', scene_config['fname'])
+
+azimuth_error_avg = azimuth_error_sum / total_cnt
+dist_error_avg = dist_error_sum / total_cnt
+success_rate = success_cnt / total_cnt
+azimuth_success_rate = azimuth_in_range / total_cnt
+dist_success_rate = dist_in_range / total_cnt
+print('azimuth_error_avg', azimuth_error_avg)
+print('dist_error_avg', dist_error_avg)
+print('azimuth_success_rate', azimuth_success_rate)
+print('dist_success_rate', dist_success_rate)
+print('success_rate', success_rate)
