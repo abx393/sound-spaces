@@ -29,6 +29,7 @@ from pathlib import Path
 sys.path.append("/content/Spatial_AST")
 import spatial_ast
 
+ir_type = 'ir_precomputed' # 'ir_precomputed', 'ir_computed'
 
 def normalize_audio(audio_data, target_dBFS=-14.0):
     rms = np.sqrt(np.mean(audio_data ** 2))  # Calculate the RMS of the audio
@@ -55,8 +56,11 @@ def run_spatial_ast(ir, scene_id, setup_id):
     print('ir.shape after', ir.shape)
 
     normalize = True
-    waveform, sr = sf.read('/content/sound-spaces/res/singing.wav')
+    waveform, sr = sf.read('/content/drive/MyDrive/speech_navigation/come_here_10s.wav')    
+    #waveform, sr = sf.read('/content/drive/MyDrive/data_and_checkpoints/eval/audio/YSObG51xihGc.wav')
+    #waveform, sr = sf.read('/content/sound-spaces/res/singing.wav')
     #waveform, sr = sf.read('/content/drive/MyDrive/speech_navigation/follow_me.wav')
+    print('DEBUG sr', sr)
     waveform = waveform[:, 0] if len(waveform.shape) > 1 else waveform
     waveform = signal.resample_poly(waveform, 32000, sr) if sr != 32000 else waveform
     waveform = normalize_audio(waveform, -14.0) if normalize else waveform
@@ -113,25 +117,27 @@ def run_spatial_ast(ir, scene_id, setup_id):
 
     plt.clf()
     plt.title('Sound Distance Estimation')
-    plt.bar(np.arange(0, len(distance_logits[0]) / 2, 0.5), distance_logits[0], width=0.5)
-    plt.plot(distance_gt, np.max(distance_logits[0]) * 1.5, 'go', markersize=15)
+    plt.bar(np.arange(0, len(distance_logits[0]) / 2, 0.5), distance_logits[0], width=0.3)
+    plt.vlines(distance_gt, -5, 5, colors='green')
+    #plt.plot(distance_gt, np.max(distance_logits[0]) * 1.5, 'go', markersize=15)
     plt.legend(['Ground Truth Distance', 'Distance Prediction Logits'])
     plt.xlabel('Distance (m)')
-    plt.savefig(os.path.join('/content/drive/MyDrive/spoken_navigation_output', scene_id, setup_id, 'distance_logits'))
+    plt.savefig(os.path.join('/content/drive/MyDrive/speech_navigation_output', scene_id, setup_id, ir_type, 'distance_logits'))
 
     plt.clf()
     plt.title('Sound Azimuth Estimation')
-    plt.bar(np.arange(len(azimuth_logits[0])), azimuth_logits[0])
-    plt.plot(azimuth_gt, np.max(azimuth_logits[0]) * 1.5, 'go', markersize=10)
+    plt.bar(np.arange(len(azimuth_logits[0])), azimuth_logits[0], width=0.3)
+    plt.vlines(azimuth_gt, -5, 5, colors='green')
+    #plt.plot(azimuth_gt, np.max(azimuth_logits[0]) * 1.5, 'go', markersize=10)
     plt.legend(['Ground Truth Azimuth', 'Azimuth Prediction Logits'])
     plt.xlabel('Angle (Degrees)')
-    plt.savefig(os.path.join('/content/drive/MyDrive/spoken_navigation_output', scene_id, setup_id, 'azimuth_logits'))
+    plt.savefig(os.path.join('/content/drive/MyDrive/speech_navigation_output', scene_id, setup_id, ir_type, 'azimuth_logits'))
 
     plt.clf()
     plt.title('Sound Elevation Estimation')
-    plt.bar(np.arange(len(elevation_logits[0])), elevation_logits[0])
+    plt.bar(np.arange(len(elevation_logits[0])), elevation_logits[0], width=0.3)
     plt.xlabel('Angle (Degrees)')
-    plt.savefig(os.path.join('/content/drive/MyDrive/spoken_navigation_output', scene_id, setup_id, 'elevation_logits'))
+    plt.savefig(os.path.join('/content/drive/MyDrive/speech_navigation_output', scene_id, setup_id, ir_type, 'elevation_logits'))
 
     return dist_pred, elevation_pred, azimuth_pred, distance_gt, azimuth_gt
 
@@ -220,7 +226,7 @@ def display_map(topdown_map, out_file, scene_id, setup_id, source_pos=None, agen
     # plt.show(block=False)
     # plt.set_xticks([1,2,3,4])
     # plt.tight_layout()
-    plt.savefig(os.path.join('/content/drive/MyDrive/spoken_navigation_output', scene_id, setup_id, out_file),
+    plt.savefig(os.path.join('/content/drive/MyDrive/speech_navigation_output', scene_id, setup_id, ir_type, out_file),
                 bbox_inches='tight')
 
 
@@ -267,7 +273,7 @@ audio_sensor_spec.channelLayout.type = habitat_sim.sensor.RLRAudioPropagationCha
 audio_sensor_spec.channelLayout.channelCount = 1
 # audio sensor location set with respect to the agent
 audio_sensor_spec.position = [0.0, 1.5, 0.0]  # audio sensor has a height of 1.5m
-audio_sensor_spec.acousticsConfig.sampleRate = 48000
+audio_sensor_spec.acousticsConfig.sampleRate = 32000
 # whether indrect (reverberation) is present in the rendered IR
 audio_sensor_spec.acousticsConfig.indirect = True
 sim.add_sensor(audio_sensor_spec)
@@ -295,7 +301,7 @@ for scene_config in reverb_config['data']:
     setup_id = scene_config['fname'].split('/')[-1].split('.')[0]
     print('scene_id', scene_id)
     print('setup_id', setup_id)
-    os.makedirs(os.path.join('/content/drive/MyDrive/spoken_navigation_output', scene_id, setup_id), exist_ok=True)
+    os.makedirs(os.path.join('/content/drive/MyDrive/speech_navigation_output', scene_id, setup_id, ir_type), exist_ok=True)
 
     # try:
     fname = f'/content/drive/MyDrive/mp3d_reverb/binaural/{scene_config["fname"]}'
@@ -347,27 +353,32 @@ for scene_config in reverb_config['data']:
     for i in range(2):
         plt.plot(np.linspace(0, samples_clip / sr, samples_clip), ir[i, :samples_clip])
         plt.savefig(
-            os.path.join('/content/drive/MyDrive/spoken_navigation_output', scene_id, setup_id, 'ir{}'.format(i)))
+            os.path.join('/content/drive/MyDrive/speech_navigation_output', scene_id, setup_id, 'ir{}'.format(i)))
 
     plt.clf()
 
     plt.title('Impulse Response Precomputed')
     for i in range(2):
         plt.plot(np.linspace(0, samples_clip / sr, samples_clip), ir_precomputed[i, :samples_clip])
-        plt.savefig(os.path.join('/content/drive/MyDrive/spoken_navigation_output', scene_id, setup_id,
+        plt.savefig(os.path.join('/content/drive/MyDrive/speech_navigation_output', scene_id, setup_id,
                                  'ir_precomputed{}'.format(i)))
 
     plt.clf()
-    ir = ir_precomputed
+    if ir_type == 'ir_precomputed':
+        ir = ir_precomputed
 
     # convert input audio from stereo to mono
-    sound = AudioSegment.from_wav('/content/sound-spaces/res/singing.wav')
+    sound = AudioSegment.from_wav('/content/drive/MyDrive/speech_navigation/come_here_10s.wav')
+    #sound = AudioSegment.from_wav('/content/drive/MyDrive/data_and_checkpoints/eval/audio/YSObG51xihGc.wav')
+    #sound = AudioSegment.from_wav('/content/sound-spaces/res/singing.wav')
     #sound = AudioSegment.from_wav('/content/drive/MyDrive/speech_navigation/follow_me.wav')
     sound = sound.set_channels(1)
-    sound.export("/content/singing.wav", format="wav")
+    sound.export('/content/come_here_10s.wav', format='wav')
+    #sound.export("/content/singing.wav", format="wav")
     #sound.export("/content/follow_me_mono.wav", format="wav")
     
-    sr, vocal = wavfile.read('/content/singing.wav')
+    sr, vocal = wavfile.read('/content/come_here_10s.wav')
+    #sr, vocal = wavfile.read('/content/singing.wav')
     #sr, vocal = wavfile.read('/content/follow_me_mono.wav')
     print('sr', sr, 'vocal shape', vocal.shape)
 
@@ -382,7 +393,7 @@ for scene_config in reverb_config['data']:
     plt.title('Speech convolved with IR')
     for i in range(2):
         plt.plot(np.linspace(0, len(convolved_vocal[i]) / sr, len(convolved_vocal[i])), convolved_vocal[i])
-        plt.savefig(os.path.join('/content/drive/MyDrive/spoken_navigation_output', scene_id, setup_id,
+        plt.savefig(os.path.join('/content/drive/MyDrive/speech_navigation_output', scene_id, setup_id, ir_type,
                                  'speech_convolved_with_ir{}'.format(i)))
     plt.clf()
 
@@ -390,7 +401,7 @@ for scene_config in reverb_config['data']:
     iinfo = np.iinfo(np.int16)
     convolved_vocal = (convolved_vocal / np.max(np.abs(convolved_vocal)) * iinfo.max).astype(np.int16)
     wavfile.write(
-        os.path.join('/content/drive/MyDrive/spoken_navigation_output', scene_id, setup_id, 'reverberent_speech.wav'),
+        os.path.join('/content/drive/MyDrive/speech_navigation_output', scene_id, setup_id, ir_type, 'reverberent_speech.wav'),
         sr, convolved_vocal.T)
 
     rt60 = measure_rt60(ir[0], sr, decay_db=30, plot=True)
