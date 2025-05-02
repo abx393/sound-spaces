@@ -145,7 +145,7 @@ def run_spatial_ast(ir, scene_id, setup_id):
     plt.xlabel('Angle (Degrees)')
     plt.savefig(os.path.join('/content/drive/MyDrive/speech_navigation_output', scene_id, setup_id, ir_type, 'elevation_logits'))
 
-    return dist_pred, elevation_pred, azimuth_pred, distance_gt, azimuth_gt
+    return dist_pred, elevation_pred, azimuth_pred, distance_gt, azimuth_gt, elevation_gt
 
 
 def get_shortest_path(sim, agent, goal_pos):
@@ -254,6 +254,9 @@ def quaternion_to_axis_angle(quat):
 
     return axis, angle
 
+def euclidean_dist(x, y):
+    return math.sqrt((x[0] - y[0]) ** 2 + (x[1] - y[1]) ** 2 + (x[2] - y[2]) ** 2)
+
 
 device = torch.device('cuda')
 
@@ -295,7 +298,7 @@ azimuth_in_range = 0
 azimuth_error_sum = 0
 dist_in_range = 0
 dist_error_sum = 0
-azimuth_success_cnt = 0
+success_cnt = 0
 total_cnt = 0
 # set navmesh path for searching for navigable points
 sim.pathfinder.load_nav_mesh(os.path.join(f"data/scene_datasets/mp3d/{scene_id}/{scene_id}.navmesh"))
@@ -419,7 +422,7 @@ for scene_config in reverb_config['data']:
     action_names = list(cfg.agents[0].action_space.keys())
     print('action names', action_names)
 
-    dist_pred, elevation_pred, azimuth_pred, dist_gt, azimuth_gt = run_spatial_ast(ir, scene_id, setup_id)
+    dist_pred, elevation_pred, azimuth_pred, dist_gt, azimuth_gt, elevation_gt = run_spatial_ast(ir, scene_id, setup_id)
     azimuth_error = min(abs(azimuth_gt - azimuth_pred), 360 - abs(azimuth_gt - azimuth_pred))
     dist_error = abs(dist_gt - dist_pred)
     if azimuth_error <= 20:
@@ -427,9 +430,10 @@ for scene_config in reverb_config['data']:
     if dist_error <= 1:
         dist_in_range += 1
     azimuth_error_sum += azimuth_error
-    distance_error_sum += dist_error
+    dist_error_sum += dist_error
     print('azimuth_in_range', azimuth_in_range)
     print('dist_in_range', dist_in_range)
+    
     print('total count', total_cnt)
 
     agent_pos = agent.get_state().position
@@ -465,6 +469,10 @@ for scene_config in reverb_config['data']:
 
     agent_rot_quat = agent.get_state().rotation
     agent_pos = agent.get_state().position
+    if euclidean_dist(agent_pos, sim.pathfinder.snapPoint(source_pos)) <= 1:
+        success_cnt += 1
+    print('success_cnt', success_cnt)
+    
     all_points = path_points + [agent_pos, goal_pos, source_pos]
     pos_pixels = convert_points_to_topdown_pixel_coordinates(sim.pathfinder, all_points, meters_per_pixel)
     print('source position', source_pos)
