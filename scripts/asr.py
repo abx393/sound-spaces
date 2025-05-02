@@ -5,7 +5,7 @@ model_path = "/content/sound-spaces/deepspeech-0.9.3-models.pbmm"
 ds = deepspeech.Model(model_path)
 
 # Load an audio file
-audio_path = "/content/output/reverberent_speech.wav"
+audio_path = "/content/drive/MyDrive/speech_navigation_output/come_here_10s.wav"
 with open(audio_path, "rb") as audio_file:
     audio_data = audio_file.read()
 
