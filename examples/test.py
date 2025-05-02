@@ -145,7 +145,7 @@ def run_spatial_ast(ir, scene_id, setup_id):
     plt.xlabel('Angle (Degrees)')
     plt.savefig(os.path.join('/content/drive/MyDrive/speech_navigation_output', scene_id, setup_id, ir_type, 'elevation_logits'))
 
-    return dist_pred, elevation_pred, azimuth_pred, distance_gt, azimuth_gt, elevation_gt
+    return dist_pred, elevation_pred, azimuth_pred, distance_gt, elevation_gt, azimuth_gt
 
 
 def get_shortest_path(sim, agent, goal_pos):
@@ -297,6 +297,8 @@ audio_sensor.setAudioMaterialsJSON("data/mp3d_material_config.json")
 
 azimuth_in_range = 0
 azimuth_error_sum = 0
+elevation_in_range = 0
+elevation_error_sum = 0
 dist_in_range = 0
 dist_error_sum = 0
 success_cnt = 0
@@ -423,16 +425,21 @@ for scene_config in reverb_config['data']:
     action_names = list(cfg.agents[0].action_space.keys())
     print('action names', action_names)
 
-    dist_pred, elevation_pred, azimuth_pred, dist_gt, azimuth_gt, elevation_gt = run_spatial_ast(ir, scene_id, setup_id)
+    dist_pred, elevation_pred, azimuth_pred, dist_gt, elevation_gt, azimuth_gt = run_spatial_ast(ir, scene_id, setup_id)
     azimuth_error = min(abs(azimuth_gt - azimuth_pred), 360 - abs(azimuth_gt - azimuth_pred))
+    elevation_error = min(abs(elevation_gt - elevation_pred), 360 - abs(elevation_gt - elevation_pred))
     dist_error = abs(dist_gt - dist_pred)
     if azimuth_error <= 20:
         azimuth_in_range += 1
+    if elevation_error <= 20:
+        elevation_in_range += 1
     if dist_error <= 1:
         dist_in_range += 1
     azimuth_error_sum += azimuth_error
+    elevation_error_sum += elevation_error
     dist_error_sum += dist_error
     print('azimuth_in_range', azimuth_in_range)
+    print('elevation_in_range', elevation_in_range)
     print('dist_in_range', dist_in_range)
     
     print('total count', total_cnt)
@@ -494,12 +501,18 @@ for scene_config in reverb_config['data']:
     #    print('error loading config', scene_config['fname'])
 
 azimuth_error_avg = azimuth_error_sum / total_cnt
+elevation_error_avg = elevation_error_sum / total_cnt
 dist_error_avg = dist_error_sum / total_cnt
 success_rate = success_cnt / total_cnt
 azimuth_success_rate = azimuth_in_range / total_cnt
+elevation_success_rate = elevation_in_range / total_cnt
 dist_success_rate = dist_in_range / total_cnt
+
 print('azimuth_error_avg', azimuth_error_avg)
+print('elevation_error_avg', elevation_error_avg)
 print('dist_error_avg', dist_error_avg)
+
 print('azimuth_success_rate', azimuth_success_rate)
+print('elevation_success_rate', elevation_success_rate)
 print('dist_success_rate', dist_success_rate)
 print('success_rate', success_rate)
