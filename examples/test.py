@@ -29,7 +29,7 @@ from pathlib import Path
 sys.path.append("/content/Spatial_AST")
 import spatial_ast
 
-ir_type = 'ir_precomputed' # 'ir_precomputed', 'ir_computed'
+ir_type = 'ir_computed' # 'ir_precomputed', 'ir_computed'
 
 def normalize_audio(audio_data, target_dBFS=-14.0):
     rms = np.sqrt(np.mean(audio_data ** 2))  # Calculate the RMS of the audio
