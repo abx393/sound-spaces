@@ -288,6 +288,11 @@ audio_sensor_spec.acousticsConfig.sampleRate = 32000
 audio_sensor_spec.acousticsConfig.indirect = True
 sim.add_sensor(audio_sensor_spec)
 
+agent = sim.get_agent(0)
+for i in range(9):
+    sim.step('turn_right')
+print('agent.get_state().rotation', agent.get_state().rotation)
+print('axis angle', quaternion_to_axis_angle(agent.get_state().rotation))
 audio_sensor = sim.get_agent(0)._sensors["audio_sensor"]
 audio_sensor.setAudioMaterialsJSON("data/mp3d_material_config.json")
 
