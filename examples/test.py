@@ -101,7 +101,7 @@ def run_spatial_ast(ir, scene_id, setup_id):
     dx = source_pos[0] - agent_pos[0]  # LEFT-RIGHT
     dy = source_pos[1] - (agent_pos[1] + 1.5)  # UP-DOWN
     dz = source_pos[2] - agent_pos[2]  # FRONT-BACK
-
+    print('dy', dy)
     distance_gt = np.sqrt(dx ** 2 + dy ** 2 + dz ** 2)
     print('distance GT', distance_gt)
     dist_pred = np.argmax(distance_logits, axis=1)[0] * 0.5
@@ -185,6 +185,7 @@ def get_shortest_path(sim, agent, goal_pos):
 
 
 def dist_angle_to_cartesian(agent_pos, dist_pred, elevation_pred, azimuth_pred):
+    elevation_pred -= 90
     pred_x = agent_pos[0] + dist_pred * math.cos(math.radians(elevation_pred)) * math.cos(math.radians(azimuth_pred))
     pred_y = agent_pos[1] + dist_pred * math.sin(math.radians(elevation_pred))
     pred_z = agent_pos[2] + dist_pred * math.cos(math.radians(elevation_pred)) * -math.sin(math.radians(azimuth_pred))
@@ -469,7 +470,7 @@ for scene_config in reverb_config['data']:
 
     agent_rot_quat = agent.get_state().rotation
     agent_pos = agent.get_state().position
-    if euclidean_dist(agent_pos, sim.pathfinder.snapPoint(source_pos)) <= 1:
+    if euclidean_dist(agent_pos, sim.pathfinder.snap_point(source_pos)) <= 1:
         success_cnt += 1
     print('success_cnt', success_cnt)
     
