@@ -274,6 +274,6 @@ for index in range(30):
     # print("Displaying the raw map from get_topdown_view:")
     # display_map(sim_topdown_map, 'habitat_sim_get_topdown_view', scene_id, setup_id, source_pos=pos_pixels[-1], goal_pos=pos_pixels[-2], agent_pos=pos_pixels[-3], agent_angle=rot_angle, path_points=pos_pixels[:-3])
     print("Displaying the map from the Habitat-Lab maps module:")
-    display_map(hablab_topdown_map, 'habitat_lab_get_topdown_map', scene_id, setup_id, source_pos=source_pos, agent_pos=agent_pos, agent_angle=rot_angle)
+    display_map(hablab_topdown_map, 'habitat_lab_get_topdown_map', scene_id, index, source_pos=source_pos, agent_pos=agent_pos, agent_angle=rot_angle)
 
 
